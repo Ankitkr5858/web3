@@ -1,0 +1,171 @@
+{
+  "/Users/ankitkumar/Downloads/web3/serverless.yml": {
+    "versionFramework": "4.9.0",
+    "servicePath": "/Users/ankitkumar/Downloads/web3/serverless.yml",
+    "serviceConfigFileName": "serverless.yml",
+    "service": {
+      "service": "metakeep-transaction-telemetry",
+      "provider": {
+        "name": "aws",
+        "runtime": "nodejs18.x",
+        "region": "us-east-1",
+        "environment": {
+          "DYNAMODB_TABLE": "metakeep-transaction-telemetry-dev"
+        },
+        "iam": {
+          "role": {
+            "statements": [
+              {
+                "Effect": "Allow",
+                "Action": [
+                  "dynamodb:PutItem",
+                  "dynamodb:Query",
+                  "dynamodb:UpdateItem"
+                ],
+                "Resource": "arn:aws:dynamodb:us-east-1:*:table/metakeep-transaction-telemetry-dev"
+              }
+            ]
+          }
+        },
+        "stage": "dev",
+        "versionFunctions": true
+      },
+      "plugins": [
+        "serverless-plugin-typescript",
+        "serverless-offline"
+      ],
+      "functions": {
+        "recordPageView": {
+          "handler": "backend/handlers/recordPageView.handler",
+          "events": [
+            {
+              "http": {
+                "path": "telemetry/pageview",
+                "method": "post",
+                "cors": true
+              }
+            }
+          ]
+        },
+        "getPageViews": {
+          "handler": "backend/handlers/getPageViews.handler",
+          "events": [
+            {
+              "http": {
+                "path": "telemetry/pageviews",
+                "method": "get",
+                "cors": true
+              }
+            }
+          ]
+        }
+      },
+      "resources": {
+        "Resources": {
+          "PageViewsTable": {
+            "Type": "AWS::DynamoDB::Table",
+            "Properties": {
+              "TableName": "metakeep-transaction-telemetry-dev",
+              "AttributeDefinitions": [
+                {
+                  "AttributeName": "timestamp",
+                  "AttributeType": "N"
+                }
+              ],
+              "KeySchema": [
+                {
+                  "AttributeName": "timestamp",
+                  "KeyType": "HASH"
+                }
+              ],
+              "BillingMode": "PAY_PER_REQUEST"
+            }
+          }
+        }
+      }
+    },
+    "provider": {
+      "name": "aws",
+      "runtime": "nodejs18.x",
+      "region": "us-east-1",
+      "environment": {
+        "DYNAMODB_TABLE": "metakeep-transaction-telemetry-dev"
+      },
+      "iam": {
+        "role": {
+          "statements": [
+            {
+              "Effect": "Allow",
+              "Action": [
+                "dynamodb:PutItem",
+                "dynamodb:Query",
+                "dynamodb:UpdateItem"
+              ],
+              "Resource": "arn:aws:dynamodb:us-east-1:*:table/metakeep-transaction-telemetry-dev"
+            }
+          ]
+        }
+      },
+      "stage": "dev",
+      "versionFunctions": true
+    },
+    "dashboard": {
+      "isEnabledForService": false,
+      "requiredAuthentication": false,
+      "orgFeaturesInUse": null,
+      "orgObservabilityIntegrations": null,
+      "serviceAppId": null,
+      "serviceProvider": null,
+      "instanceParameters": null
+    },
+    "error": {
+      "message": "Serverless plugin \"serverless-plugin-typescript\" not found. Make sure it's installed and listed in the \"plugins\" section of your serverless config file. Use the --debug flag to learn more.",
+      "stack": "ServerlessError2: Serverless plugin \"serverless-plugin-typescript\" not found. Make sure it's installed and listed in the \"plugins\" section of your serverless config file. Use the --debug flag to learn more.\n    at PluginManager.resolveServicePlugins (/Users/ankitkumar/.serverless/releases/4.9.0/serverless/lib/classes/plugin-manager.js:376:15)\n    at process.processTicksAndRejections (node:internal/process/task_queues:95:5)\n    at async PluginManager.loadAllPlugins (/Users/ankitkumar/.serverless/releases/4.9.0/serverless/lib/classes/plugin-manager.js:266:7)\n    at async Serverless.init (/Users/ankitkumar/.serverless/releases/4.9.0/serverless/lib/serverless.js:163:5)\n    at async runFramework (/Users/ankitkumar/.serverless/releases/4.9.0/sf-core/src/lib/runners/framework.js:457:3)\n    at async TraditionalRunner.run (/Users/ankitkumar/.serverless/releases/4.9.0/sf-core/src/lib/runners/framework.js:97:9)\n    at async route (/Users/ankitkumar/.serverless/releases/4.9.0/sf-core/src/lib/router.js:101:20)\n    at async Object.run (/Users/ankitkumar/.serverless/releases/4.9.0/sf-core/src/index.js:39:3)\n    at async run2 (/Users/ankitkumar/.serverless/releases/4.9.0/sf-core/bin/sf-core.js:31:3)",
+      "code": "PLUGIN_NOT_FOUND"
+    },
+    "serviceRawFile": "service: metakeep-transaction-telemetry\n\nprovider:\n  name: aws\n  runtime: nodejs18.x\n  region: us-east-1\n  environment:\n    DYNAMODB_TABLE: ${self:service}-${sls:stage}\n  iam:\n    role:\n      statements:\n        - Effect: Allow\n          Action:\n            - dynamodb:PutItem\n            - dynamodb:Query\n            - dynamodb:UpdateItem\n          Resource: \"arn:aws:dynamodb:${aws:region}:*:table/${self:provider.environment.DYNAMODB_TABLE}\"\n\nplugins:\n  - serverless-plugin-typescript\n  - serverless-offline\n\nfunctions:\n  recordPageView:\n    handler: backend/handlers/recordPageView.handler\n    events:\n      - http:\n          path: telemetry/pageview\n          method: post\n          cors: true\n  getPageViews:\n    handler: backend/handlers/getPageViews.handler\n    events:\n      - http:\n          path: telemetry/pageviews\n          method: get\n          cors: true\n\nresources:\n  Resources:\n    PageViewsTable:\n      Type: 'AWS::DynamoDB::Table'\n      Properties:\n        TableName: ${self:provider.environment.DYNAMODB_TABLE}\n        AttributeDefinitions:\n          - AttributeName: timestamp\n            AttributeType: N\n        KeySchema:\n          - AttributeName: timestamp\n            KeyType: HASH\n        BillingMode: PAY_PER_REQUEST",
+    "command": [
+      "deploy"
+    ],
+    "options": {
+      "verbose": true,
+      "aws-profile": "default",
+      "debug": "*"
+    },
+    "orgId": "bd6f7e49-c0ae-411c-b10d-f4210cf90513",
+    "orgName": "ankitkr5858",
+    "userId": "sC6QDkKSpljWsdPFzd",
+    "userName": "ankitkr5858",
+    "serviceProviderAwsAccountId": "503711231251",
+    "serviceProviderAwsCfStackName": "metakeep-transaction-telemetry-dev",
+    "serviceProviderAwsCfStackId": "arn:aws:cloudformation:us-east-1:503711231251:stack/metakeep-transaction-telemetry-dev/a3c6cd90-0374-11f0-800c-0affcf3d3ae5",
+    "serviceProviderAwsCfStackCreated": "2025-03-17T21:13:14.810Z",
+    "serviceProviderAwsCfStackUpdated": "2025-03-18T20:58:20.584Z",
+    "serviceProviderAwsCfStackStatus": "UPDATE_ROLLBACK_FAILED",
+    "serviceProviderAwsCfStackOutputs": [
+      {
+        "OutputKey": "RecordPageViewLambdaFunctionQualifiedArn",
+        "OutputValue": "arn:aws:lambda:us-east-1:503711231251:function:metakeep-transaction-telemetry-dev-recordPageView:1",
+        "Description": "Current Lambda function version",
+        "ExportName": "sls-metakeep-transaction-telemetry-dev-RecordPageViewLambdaFunctionQualifiedArn"
+      },
+      {
+        "OutputKey": "GetPageViewsLambdaFunctionQualifiedArn",
+        "OutputValue": "arn:aws:lambda:us-east-1:503711231251:function:metakeep-transaction-telemetry-dev-getPageViews:1",
+        "Description": "Current Lambda function version",
+        "ExportName": "sls-metakeep-transaction-telemetry-dev-GetPageViewsLambdaFunctionQualifiedArn"
+      },
+      {
+        "OutputKey": "ServiceEndpoint",
+        "OutputValue": "https://fvttcauoy1.execute-api.us-east-1.amazonaws.com/dev",
+        "Description": "URL of the service endpoint",
+        "ExportName": "sls-metakeep-transaction-telemetry-dev-ServiceEndpoint"
+      },
+      {
+        "OutputKey": "ServerlessDeploymentBucketName",
+        "OutputValue": "metakeep-transaction-tele-serverlessdeploymentbuck-igehgniiznpr",
+        "ExportName": "sls-metakeep-transaction-telemetry-dev-ServerlessDeploymentBucketName"
+      }
+    ]
+  }
+}
