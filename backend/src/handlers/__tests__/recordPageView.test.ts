@@ -1,19 +1,11 @@
 import { handler } from '../recordPageView';
-import { DynamoDB } from 'aws-sdk';
 import { APIGatewayProxyEvent, Context } from 'aws-lambda';
-
-jest.mock('aws-sdk', () => ({
-  DynamoDB: {
-    DocumentClient: jest.fn(() => ({
-      update: jest.fn().mockReturnThis(),
-      promise: jest.fn().mockResolvedValue({})
-    }))
-  }
-}));
+import { DynamoDB } from 'aws-sdk';
 
 describe('recordPageView handler', () => {
-  let event: APIGatewayProxyEvent;
-  let context: Context;
+  let event: Partial<APIGatewayProxyEvent>;
+  let context: Partial<Context>;
+  let mockDynamoDb: jest.Mocked<DynamoDB.DocumentClient>;
 
   beforeEach(() => {
     event = {
@@ -21,31 +13,47 @@ describe('recordPageView handler', () => {
       headers: {
         'Content-Type': 'application/json'
       }
-    } as any;
-    context = {} as Context;
+    };
+    context = {};
+
+    // Create a new mock instance for each test
+    mockDynamoDb = new DynamoDB.DocumentClient() as jest.Mocked<DynamoDB.DocumentClient>;
+    (DynamoDB.DocumentClient as jest.Mock).mockImplementation(() => mockDynamoDb);
+  });
+
+  afterEach(() => {
+    jest.clearAllMocks();
   });
 
   it('should record a page view successfully', async () => {
-    const response = await handler(event, context, () => {});
+    const mockUpdate = jest.fn().mockReturnValue({
+      promise: jest.fn().mockResolvedValue({})
+    });
+
+    mockDynamoDb.update = mockUpdate;
+
+    const response = await handler(event as APIGatewayProxyEvent, context as Context);
     
     expect(response.statusCode).toBe(200);
     expect(JSON.parse(response.body)).toEqual({
       message: 'Page view recorded'
     });
+    expect(mockUpdate).toHaveBeenCalled();
   });
 
   it('should handle errors gracefully', async () => {
-    const mockError = new Error('DynamoDB error');
-    jest.spyOn(DynamoDB.DocumentClient.prototype, 'update')
-      .mockImplementationOnce(() => {
-        throw mockError;
-      });
+    const mockUpdate = jest.fn().mockReturnValue({
+      promise: jest.fn().mockRejectedValue(new Error('DynamoDB error'))
+    });
 
-    const response = await handler(event, context, () => {});
+    mockDynamoDb.update = mockUpdate;
+
+    const response = await handler(event as APIGatewayProxyEvent, context as Context);
     
     expect(response.statusCode).toBe(500);
     expect(JSON.parse(response.body)).toEqual({
       error: 'Could not record page view'
     });
+    expect(mockUpdate).toHaveBeenCalled();
   });
 });
