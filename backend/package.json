@@ -5,7 +5,7 @@
   "scripts": {
     "deploy": "serverless deploy",
     "dev": "serverless offline",
-    "test": "jest",
+    "test": "jest --verbose",
     "lint": "eslint . --ext .ts",
     "build": "tsc"
   },
@@ -24,12 +24,5 @@
     "eslint": "^8.56.0",
     "jest": "^29.7.0",
     "ts-jest": "^29.1.2"
-  },
-  "jest": {
-    "preset": "ts-jest",
-    "testEnvironment": "node",
-    "roots": ["<rootDir>/src"],
-    "testMatch": ["**/__tests__/**/*.test.ts"],
-    "setupFiles": ["<rootDir>/src/test/setup.ts"]
   }
 }

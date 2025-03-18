@@ -1,7 +1,7 @@
 import { DynamoDB } from 'aws-sdk';
 import type { APIGatewayProxyHandler } from 'aws-lambda';
 
-const dynamoDb = new DynamoDB.DocumentClient({
+const dynamoDb = process.env.NODE_ENV === 'test' ? require('../test/setup').mockDynamoDb : new DynamoDB.DocumentClient({
   region: process.env.AWS_REGION
 });
 

@@ -10,5 +10,9 @@ module.exports = {
       }]
     },
     moduleFileExtensions: ['ts', 'js', 'json', 'node'],
-    setupFiles: ['<rootDir>/src/test/setup.ts']
+    setupFilesAfterEnv: ['<rootDir>/src/test/setup.ts'],
+    clearMocks: true,
+    resetMocks: true,
+    restoreMocks: true,
+    verbose: true
   };

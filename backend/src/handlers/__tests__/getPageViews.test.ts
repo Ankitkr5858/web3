@@ -1,59 +1,62 @@
 import { handler } from '../getPageViews';
-import { APIGatewayProxyEvent, Context } from 'aws-lambda';
+import { APIGatewayProxyEvent, Context, APIGatewayProxyResult } from 'aws-lambda';
 import { DynamoDB } from 'aws-sdk';
 
+const mockDynamoDb = new DynamoDB.DocumentClient();
+
 describe('getPageViews handler', () => {
-  let event: Partial<APIGatewayProxyEvent>;
-  let context: Partial<Context>;
-  let mockDynamoDb: jest.Mocked<DynamoDB.DocumentClient>;
+  const mockEvent: Partial<APIGatewayProxyEvent> = {
+    httpMethod: 'GET',
+    headers: {
+      'Content-Type': 'application/json'
+    }
+  };
+
+  const mockContext: Partial<Context> = {};
+
+  const mockCallback = jest.fn();
 
   beforeEach(() => {
-    event = {
-      httpMethod: 'GET',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    };
-    context = {};
-
-    // Create a new mock instance for each test
-    mockDynamoDb = new DynamoDB.DocumentClient() as jest.Mocked<DynamoDB.DocumentClient>;
-    (DynamoDB.DocumentClient as jest.Mock).mockImplementation(() => mockDynamoDb);
-  });
-
-  afterEach(() => {
-    jest.clearAllMocks();
+    // Reset mock implementation before each test
+    (mockDynamoDb.query as jest.Mock).mockReturnValue({
+      promise: jest.fn().mockResolvedValue({ Items: [] })
+    });
+    mockCallback.mockClear();
   });
 
   it('should return page views successfully', async () => {
     const mockItems = [{ timestamp: Date.now(), count: 1 }];
     
-    const mockQuery = jest.fn().mockReturnValue({
+    (mockDynamoDb.query as jest.Mock).mockReturnValue({
       promise: jest.fn().mockResolvedValue({ Items: mockItems })
     });
 
-    mockDynamoDb.query = mockQuery;
-
-    const response = await handler(event as APIGatewayProxyEvent, context as Context);
+    const response = await handler(
+      mockEvent as APIGatewayProxyEvent,
+      mockContext as Context,
+      mockCallback
+    ) as APIGatewayProxyResult;
     
     expect(response.statusCode).toBe(200);
     expect(JSON.parse(response.body)).toEqual(mockItems);
-    expect(mockQuery).toHaveBeenCalled();
+    expect(mockDynamoDb.query).toHaveBeenCalled();
   });
 
   it('should handle errors gracefully', async () => {
-    const mockQuery = jest.fn().mockReturnValue({
+    (mockDynamoDb.query as jest.Mock).mockReturnValue({
       promise: jest.fn().mockRejectedValue(new Error('DynamoDB error'))
     });
 
-    mockDynamoDb.query = mockQuery;
-
-    const response = await handler(event as APIGatewayProxyEvent, context as Context);
+    const response = await handler(
+      mockEvent as APIGatewayProxyEvent,
+      mockContext as Context,
+      mockCallback
+    ) as APIGatewayProxyResult;
     
     expect(response.statusCode).toBe(500);
     expect(JSON.parse(response.body)).toEqual({
       error: 'Could not fetch page views'
     });
-    expect(mockQuery).toHaveBeenCalled();
+    expect(mockDynamoDb.query).toHaveBeenCalled();
   });
 });
