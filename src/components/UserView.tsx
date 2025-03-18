@@ -1,14 +1,12 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import Web3 from 'web3';
 import toast from 'react-hot-toast';
 import { CheckCircle, XCircle, Loader2, AlertCircle } from 'lucide-react';
 import type { TransactionDetails } from '../types';
+import { MetaKeepSDKProvider } from '../utils/metakeep';
 
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-
 const SEPOLIA_CHAIN_ID = 11155111;
-const SEPOLIA_HEX_CHAIN_ID = '0xaa36a7';
 
 export default function UserView() {
   const [searchParams] = useSearchParams();
@@ -18,7 +16,8 @@ export default function UserView() {
     'idle'
   );
   const [error, setError] = useState<string>('');
-  const [web3, setWeb3] = useState<Web3 | null>(null);
+  const [provider, setProvider] = useState<MetaKeepSDKProvider | null>(null);
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [currentChainId, setCurrentChainId] = useState<number | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
@@ -87,153 +86,107 @@ export default function UserView() {
   useEffect(() => {
     let mounted = true;
 
-    const initWeb3 = async () => {
-      if (!window.ethereum) {
-        setError('Please install MetaMask or another Web3 wallet');
-        setStatus('error');
-        return;
-      }
-
+    const initMetaMask = async () => {
       try {
-        const provider = window.ethereum;
-        const web3Instance = new Web3(provider);
-        
-        await provider.request({ method: 'eth_requestAccounts' });
+        setStatus('loading');
+        setError('');
+        console.log('Starting MetaKeep initialization...');
+        const metakeepProvider = new MetaKeepSDKProvider(import.meta.env.VITE_METAKEEP_APP_ID || '');
         
         if (!mounted) return;
-        
-        setWeb3(web3Instance);
 
-        const chainId = await web3Instance.eth.getChainId();
-        setCurrentChainId(chainId);
-
-        provider.on('chainChanged', (chainId: string) => {
-          if (!mounted) return;
-          const numericChainId = parseInt(chainId, 16);
-          setCurrentChainId(numericChainId);
-          
-          if (status === 'pending_network' && numericChainId === SEPOLIA_CHAIN_ID) {
-            setStatus('idle');
-            setIsProcessing(false);
-          }
-        });
-
-        provider.on('accountsChanged', () => {
-          if (!mounted) return;
-          setIsProcessing(false);
+        try {
+          console.log('Attempting to connect wallet...');
+          const wallet = await metakeepProvider.connect();
+          console.log('Wallet connected successfully:', wallet.address);
+          setWalletAddress(wallet.address);
+          setCurrentChainId(wallet.chainId);
+          setProvider(metakeepProvider);
           setStatus('idle');
-        });
+        } catch (error: any) {
+          console.error('Wallet connection error:', error);
+          throw error;
+        }
 
       } catch (err: any) {
         if (!mounted) return;
         console.error('Failed to initialize Web3:', err);
         setError(err.message || 'Failed to connect to wallet');
         setStatus('error');
+        setProvider(null);
       }
     };
 
-    if (!isInitializing && txDetails) {
-      initWeb3();
+    if (!isInitializing && !provider && status !== 'error') {
+      initMetaMask();
     }
 
     return () => {
       mounted = false;
+      if (provider) {
+        provider.disconnect().catch(console.error);
+      }
     };
-  }, [isInitializing, txDetails, status]);
-
-  const addSepoliaNetwork = useCallback(async () => {
-    if (!window.ethereum || isProcessing) return false;
-    
-    try {
-      await window.ethereum.request({
-        method: 'wallet_addEthereumChain',
-        params: [
-          {
-            chainId: SEPOLIA_HEX_CHAIN_ID,
-            chainName: 'Sepolia Test Network',
-            nativeCurrency: {
-              name: 'ETH',
-              symbol: 'ETH',
-              decimals: 18,
-            },
-            rpcUrls: ['https://rpc.sepolia.org'],
-            blockExplorerUrls: ['https://sepolia.etherscan.io'],
-          },
-        ],
-      });
-      return true;
-    } catch (error) {
-      console.error('Failed to add Sepolia network:', error);
-      return false;
-    }
-  }, [isProcessing]);
+  }, [isInitializing, provider, status]);
 
   const switchToSepoliaNetwork = useCallback(async () => {
-    if (!window.ethereum || isProcessing) {
-      throw new Error('No Web3 provider found or transaction in progress');
+    if (!provider || isProcessing) {
+      throw new Error('No MetaMask provider found or transaction in progress');
     }
 
     try {
-      await window.ethereum.request({
-        method: 'wallet_switchEthereumChain',
-        params: [{ chainId: SEPOLIA_HEX_CHAIN_ID }],
-      });
+      await provider.switchNetwork(SEPOLIA_CHAIN_ID);
+      setCurrentChainId(SEPOLIA_CHAIN_ID);
       return true;
-    } catch (switchError: any) {
-      if (switchError.code === 4902) {
-        const added = await addSepoliaNetwork();
-        if (added) {
-          try {
-            await window.ethereum.request({
-              method: 'wallet_switchEthereumChain',
-              params: [{ chainId: SEPOLIA_HEX_CHAIN_ID }],
-            });
-            return true;
-          } catch (error) {
-            console.error('Failed to switch to Sepolia after adding:', error);
-            return false;
-          }
-        }
-        return false;
-      }
-      console.error('Failed to switch network:', switchError);
+    } catch (error) {
+      console.error('Failed to switch network:', error);
       return false;
     }
-  }, [addSepoliaNetwork, isProcessing]);
+  }, [provider, isProcessing]);
 
   const executeTransaction = useCallback(async () => {
-    if (!txDetails || !web3 || isProcessing) return;
+    if (!txDetails || !provider || !walletAddress || isProcessing) return;
 
     try {
       setIsProcessing(true);
       setStatus('loading');
 
-      const accounts = await web3.eth.getAccounts();
-      if (!accounts || accounts.length === 0) {
-        throw new Error('No accounts found. Please connect your wallet.');
-      }
-
-      const chainId = await web3.eth.getChainId();
-      if (chainId !== SEPOLIA_CHAIN_ID) {
+      if (currentChainId !== SEPOLIA_CHAIN_ID) {
         const switched = await switchToSepoliaNetwork();
         if (!switched) {
           setStatus('pending_network');
           return;
         }
       }
-      
-      const contract = new web3.eth.Contract(JSON.parse(txDetails.abi), txDetails.contractAddress);
 
-      const method = txDetails.functionName;
-      if (!contract.methods[method]) {
-        throw new Error(`Function ${method} not found in contract`);
+      // Create contract interface and encode function data
+      const { Interface } = await import('@ethersproject/abi');
+      const contractInterface = new Interface(JSON.parse(txDetails.abi));
+      const data = contractInterface.encodeFunctionData(
+        txDetails.functionName,
+        txDetails.params || []
+      );
+
+      // Validate Ethereum address format
+      if (!/^0x[a-fA-F0-9]{40}$/.test(txDetails.contractAddress)) {
+        throw new Error('Invalid Ethereum address format');
       }
 
-      const tx = await contract.methods[method](...(txDetails.params || [])).send({
-        from: accounts[0],
+      // Add transaction timeout
+      const txPromise = provider.signTransaction({
+        to: txDetails.contractAddress,
+        data: data,
+        value: '0x0'
       });
 
-      console.log('Transaction hash:', tx.transactionHash);
+      const tx = await Promise.race([
+        txPromise,
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Transaction timeout - please try again')), 60000)
+        )
+      ]);
+
+      console.log('Transaction hash:', tx.hash);
       setStatus('success');
       toast.success('Transaction executed successfully!');
       
@@ -251,11 +204,9 @@ export default function UserView() {
       setStatus('error');
       toast.error(err.message || 'Transaction failed');
     } finally {
-      if (status !== 'pending_network') {
-        setIsProcessing(false);
-      }
+      setIsProcessing(false);
     }
-  }, [txDetails, web3, isProcessing, switchToSepoliaNetwork, status, navigate]);
+  }, [txDetails, provider, walletAddress, isProcessing, switchToSepoliaNetwork, navigate]);
 
   const resetState = useCallback(() => {
     setStatus('idle');
@@ -410,7 +361,7 @@ export default function UserView() {
 
           <button
             onClick={executeTransaction}
-            disabled={status === 'loading' || !web3 || isProcessing}
+            disabled={status === 'loading' || !provider || isProcessing}
             className="w-full flex justify-center items-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
           >
             {status === 'loading' ? (
@@ -418,7 +369,7 @@ export default function UserView() {
                 <Loader2 className="animate-spin h-5 w-5 mr-2" />
                 Processing...
               </>
-            ) : !web3 ? (
+            ) : !provider ? (
               'Connecting to Wallet...'
             ) : (
               'Execute Transaction'
