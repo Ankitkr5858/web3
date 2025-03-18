@@ -1,0 +1,19 @@
+{
+  "name": "metakeep-transaction-telemetry-backend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "deploy": "serverless deploy",
+    "dev": "serverless offline"
+  },
+  "dependencies": {
+    "aws-sdk": "^2.1574.0",
+    "@types/aws-lambda": "^8.10.134"
+  },
+  "devDependencies": {
+    "serverless": "^3.38.0",
+    "serverless-plugin-typescript": "^2.1.5",
+    "serverless-offline": "^13.3.3",
+    "typescript": "^5.5.3"
+  }
+}
