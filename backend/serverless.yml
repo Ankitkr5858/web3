@@ -4,8 +4,10 @@ provider:
   name: aws
   runtime: nodejs18.x
   region: us-east-1
+  stage: ${opt:stage, 'dev'}
   environment:
     DYNAMODB_TABLE: ${self:service}-${sls:stage}
+    NODE_ENV: ${sls:stage}
   iam:
     role:
       statements:
@@ -15,15 +17,23 @@ provider:
             - dynamodb:Query
             - dynamodb:UpdateItem
           Resource: "arn:aws:dynamodb:${aws:region}:*:table/${self:provider.environment.DYNAMODB_TABLE}"
+        - Effect: Allow
+          Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+          Resource: "arn:aws:logs:${aws:region}:*:log-group:/aws/lambda/*"
 
 plugins:
   - serverless-plugin-typescript
   - serverless-offline
 
 package:
+  individually: true
   patterns:
     - '!.git/**'
     - '!node_modules/**'
+    - '!test/**'
     - 'src/**'
 
 functions:
@@ -33,19 +43,39 @@ functions:
       - http:
           path: telemetry/pageview
           method: post
-          cors: true
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - Authorization
+            allowCredentials: true
+    environment:
+      CORS_ORIGIN: '*'
+    memorySize: 256
+    timeout: 10
+
   getPageViews:
     handler: src/handlers/getPageViews.handler
     events:
       - http:
           path: telemetry/pageviews
           method: get
-          cors: true
+          cors:
+            origin: '*'
+            headers:
+              - Content-Type
+              - Authorization
+            allowCredentials: true
+    environment:
+      CORS_ORIGIN: '*'
+    memorySize: 256
+    timeout: 10
 
 resources:
   Resources:
     PageViewsTable:
       Type: 'AWS::DynamoDB::Table'
+      DeletionPolicy: Retain
       Properties:
         TableName: ${self:provider.environment.DYNAMODB_TABLE}
         AttributeDefinitions:
@@ -55,3 +85,26 @@ resources:
           - AttributeName: timestamp
             KeyType: HASH
         BillingMode: PAY_PER_REQUEST
+        TimeToLiveSpecification:
+          AttributeName: ttl
+          Enabled: true
+        Tags:
+          - Key: Environment
+            Value: ${sls:stage}
+          - Key: Service
+            Value: ${self:service}
+
+    ApiGatewayLogGroup:
+      Type: 'AWS::Logs::LogGroup'
+      Properties:
+        RetentionInDays: 7
+
+  Outputs:
+    ApiEndpoint:
+      Description: "API Gateway endpoint URL"
+      Value:
+        Fn::Join:
+          - ""
+          - - "https://"
+            - Ref: ApiGatewayRestApi
+            - ".execute-api.${self:provider.region}.amazonaws.com/${sls:stage}"
