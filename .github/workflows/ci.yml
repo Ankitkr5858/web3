@@ -18,10 +18,12 @@ jobs:
           node-version: '18'
           cache: 'npm'
           
-      - name: Install Dependencies
+      - name: Clean Install Dependencies
         run: |
-          npm ci
-          cd backend && npm ci
+          rm -rf node_modules package-lock.json
+          rm -rf backend/node_modules backend/package-lock.json
+          npm install
+          cd backend && npm install
           
       - name: Run Frontend Tests
         run: npm run test
@@ -52,7 +54,7 @@ jobs:
       - name: Deploy Backend
         working-directory: ./backend
         run: |
-          npm ci
+          npm install
           npm run deploy -- --stage prod
         env:
           NODE_ENV: production
@@ -70,7 +72,7 @@ jobs:
           node-version: '18'
           
       - name: Install Dependencies
-        run: npm ci
+        run: npm install
         
       - name: Build
         run: npm run build
