@@ -74,13 +74,13 @@
     "RecordPageViewLogGroup": {
       "Type": "AWS::Logs::LogGroup",
       "Properties": {
-        "LogGroupName": "/aws/lambda/metakeep-transaction-telemetry-dev-recordPageView"
+        "LogGroupName": "/aws/lambda/metakeep-transaction-telemetry-prod-recordPageView"
       }
     },
     "GetPageViewsLogGroup": {
       "Type": "AWS::Logs::LogGroup",
       "Properties": {
-        "LogGroupName": "/aws/lambda/metakeep-transaction-telemetry-dev-getPageViews"
+        "LogGroupName": "/aws/lambda/metakeep-transaction-telemetry-prod-getPageViews"
       }
     },
     "IamRoleLambdaExecution": {
@@ -109,7 +109,7 @@
                 "-",
                 [
                   "metakeep-transaction-telemetry",
-                  "dev",
+                  "prod",
                   "lambda"
                 ]
               ]
@@ -126,7 +126,7 @@
                   ],
                   "Resource": [
                     {
-                      "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/metakeep-transaction-telemetry-dev*:*"
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/metakeep-transaction-telemetry-prod*:*"
                     }
                   ]
                 },
@@ -137,7 +137,7 @@
                   ],
                   "Resource": [
                     {
-                      "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/metakeep-transaction-telemetry-dev*:*:*"
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/metakeep-transaction-telemetry-prod*:*:*"
                     }
                   ]
                 },
@@ -148,7 +148,7 @@
                     "dynamodb:Query",
                     "dynamodb:UpdateItem"
                   ],
-                  "Resource": "arn:aws:dynamodb:us-east-1:*:table/metakeep-transaction-telemetry-dev"
+                  "Resource": "arn:aws:dynamodb:us-east-1:*:table/metakeep-transaction-telemetry-prod"
                 },
                 {
                   "Effect": "Allow",
@@ -158,6 +158,17 @@
                     "logs:PutLogEvents"
                   ],
                   "Resource": "arn:aws:logs:us-east-1:*:log-group:/aws/lambda/*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "lambda:CreateFunction",
+                    "lambda:UpdateFunctionCode",
+                    "lambda:UpdateFunctionConfiguration",
+                    "lambda:DeleteFunction",
+                    "lambda:GetFunction"
+                  ],
+                  "Resource": "arn:aws:lambda:us-east-1:*:function:metakeep-transaction-telemetry-prod-*"
                 }
               ]
             }
@@ -169,7 +180,7 @@
             "-",
             [
               "metakeep-transaction-telemetry",
-              "dev",
+              "prod",
               {
                 "Ref": "AWS::Region"
               },
@@ -186,17 +197,17 @@
           "S3Bucket": {
             "Ref": "ServerlessDeploymentBucket"
           },
-          "S3Key": "serverless/metakeep-transaction-telemetry/dev/1742333342915-2025-03-18T21:29:02.915Z/recordPageView.zip"
+          "S3Key": "serverless/metakeep-transaction-telemetry/prod/1742334640910-2025-03-18T21:50:40.910Z/recordPageView.zip"
         },
         "Handler": "src/handlers/recordPageView.handler",
         "Runtime": "nodejs18.x",
-        "FunctionName": "metakeep-transaction-telemetry-dev-recordPageView",
+        "FunctionName": "metakeep-transaction-telemetry-prod-recordPageView",
         "MemorySize": 256,
         "Timeout": 10,
         "Environment": {
           "Variables": {
-            "DYNAMODB_TABLE": "metakeep-transaction-telemetry-dev",
-            "NODE_ENV": "dev",
+            "DYNAMODB_TABLE": "metakeep-transaction-telemetry-prod",
+            "NODE_ENV": "prod",
             "CORS_ORIGIN": "*"
           }
         },
@@ -218,17 +229,17 @@
           "S3Bucket": {
             "Ref": "ServerlessDeploymentBucket"
           },
-          "S3Key": "serverless/metakeep-transaction-telemetry/dev/1742333342915-2025-03-18T21:29:02.915Z/getPageViews.zip"
+          "S3Key": "serverless/metakeep-transaction-telemetry/prod/1742334640910-2025-03-18T21:50:40.910Z/getPageViews.zip"
         },
         "Handler": "src/handlers/getPageViews.handler",
         "Runtime": "nodejs18.x",
-        "FunctionName": "metakeep-transaction-telemetry-dev-getPageViews",
+        "FunctionName": "metakeep-transaction-telemetry-prod-getPageViews",
         "MemorySize": 256,
         "Timeout": 10,
         "Environment": {
           "Variables": {
-            "DYNAMODB_TABLE": "metakeep-transaction-telemetry-dev",
-            "NODE_ENV": "dev",
+            "DYNAMODB_TABLE": "metakeep-transaction-telemetry-prod",
+            "NODE_ENV": "prod",
             "CORS_ORIGIN": "*"
           }
         },
@@ -243,17 +254,7 @@
         "GetPageViewsLogGroup"
       ]
     },
-    "RecordPageViewLambdaVersionuuosPGDVnIYVYmT4aLJzc8OFmr5YDw7bNjlaICRAIQ": {
-      "Type": "AWS::Lambda::Version",
-      "DeletionPolicy": "Retain",
-      "Properties": {
-        "FunctionName": {
-          "Ref": "RecordPageViewLambdaFunction"
-        },
-        "CodeSha256": "If9P0acIN5teT17Y4eM4ltAIBoRjYSIzEKDDr2cgQ1k="
-      }
-    },
-    "GetPageViewsLambdaVersionuvw9VpfSojZBc478hG9V2VEW8cLmgBQlI17IfxF1b8": {
+    "GetPageViewsLambdaVersion64q7JI6miAZS3vsG4v26OJNaohBn57GZNFd6KeENFI": {
       "Type": "AWS::Lambda::Version",
       "DeletionPolicy": "Retain",
       "Properties": {
@@ -263,10 +264,20 @@
         "CodeSha256": "If9P0acIN5teT17Y4eM4ltAIBoRjYSIzEKDDr2cgQ1k="
       }
     },
+    "RecordPageViewLambdaVersionIjYgbb1fLJywTKWQSn2fc7Cuf97Ot98vM8vFHQvSRnc": {
+      "Type": "AWS::Lambda::Version",
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "FunctionName": {
+          "Ref": "RecordPageViewLambdaFunction"
+        },
+        "CodeSha256": "If9P0acIN5teT17Y4eM4ltAIBoRjYSIzEKDDr2cgQ1k="
+      }
+    },
     "ApiGatewayRestApi": {
       "Type": "AWS::ApiGateway::RestApi",
       "Properties": {
-        "Name": "dev-metakeep-transaction-telemetry",
+        "Name": "prod-metakeep-transaction-telemetry",
         "EndpointConfiguration": {
           "Types": [
             "EDGE"
@@ -500,13 +511,13 @@
         "GetPageViewsLambdaPermissionApiGateway"
       ]
     },
-    "ApiGatewayDeployment1742333327842": {
+    "ApiGatewayDeployment1742334625992": {
       "Type": "AWS::ApiGateway::Deployment",
       "Properties": {
         "RestApiId": {
           "Ref": "ApiGatewayRestApi"
         },
-        "StageName": "dev"
+        "StageName": "prod"
       },
       "DependsOn": [
         "ApiGatewayMethodTelemetryPageviewOptions",
@@ -593,7 +604,7 @@
       "Type": "AWS::DynamoDB::Table",
       "DeletionPolicy": "Retain",
       "Properties": {
-        "TableName": "metakeep-transaction-telemetry-dev",
+        "TableName": "metakeep-transaction-telemetry-prod",
         "AttributeDefinitions": [
           {
             "AttributeName": "timestamp",
@@ -614,14 +625,15 @@
         "Tags": [
           {
             "Key": "Environment",
-            "Value": "dev"
+            "Value": "prod"
           },
           {
             "Key": "Service",
             "Value": "metakeep-transaction-telemetry"
           }
         ]
-      }
+      },
+      "Condition": "ShouldCreateTable"
     },
     "ApiGatewayLogGroup": {
       "Type": "AWS::Logs::LogGroup",
@@ -636,25 +648,25 @@
         "Ref": "ServerlessDeploymentBucket"
       },
       "Export": {
-        "Name": "sls-metakeep-transaction-telemetry-dev-ServerlessDeploymentBucketName"
-      }
-    },
-    "RecordPageViewLambdaFunctionQualifiedArn": {
-      "Description": "Current Lambda function version",
-      "Value": {
-        "Ref": "RecordPageViewLambdaVersionuuosPGDVnIYVYmT4aLJzc8OFmr5YDw7bNjlaICRAIQ"
-      },
-      "Export": {
-        "Name": "sls-metakeep-transaction-telemetry-dev-RecordPageViewLambdaFunctionQualifiedArn"
+        "Name": "sls-metakeep-transaction-telemetry-prod-ServerlessDeploymentBucketName"
       }
     },
     "GetPageViewsLambdaFunctionQualifiedArn": {
       "Description": "Current Lambda function version",
       "Value": {
-        "Ref": "GetPageViewsLambdaVersionuvw9VpfSojZBc478hG9V2VEW8cLmgBQlI17IfxF1b8"
+        "Ref": "GetPageViewsLambdaVersion64q7JI6miAZS3vsG4v26OJNaohBn57GZNFd6KeENFI"
       },
       "Export": {
-        "Name": "sls-metakeep-transaction-telemetry-dev-GetPageViewsLambdaFunctionQualifiedArn"
+        "Name": "sls-metakeep-transaction-telemetry-prod-GetPageViewsLambdaFunctionQualifiedArn"
+      }
+    },
+    "RecordPageViewLambdaFunctionQualifiedArn": {
+      "Description": "Current Lambda function version",
+      "Value": {
+        "Ref": "RecordPageViewLambdaVersionIjYgbb1fLJywTKWQSn2fc7Cuf97Ot98vM8vFHQvSRnc"
+      },
+      "Export": {
+        "Name": "sls-metakeep-transaction-telemetry-prod-RecordPageViewLambdaFunctionQualifiedArn"
       }
     },
     "ServiceEndpoint": {
@@ -675,12 +687,12 @@
             {
               "Ref": "AWS::URLSuffix"
             },
-            "/dev"
+            "/prod"
           ]
         ]
       },
       "Export": {
-        "Name": "sls-metakeep-transaction-telemetry-dev-ServiceEndpoint"
+        "Name": "sls-metakeep-transaction-telemetry-prod-ServiceEndpoint"
       }
     },
     "ApiEndpoint": {
@@ -693,10 +705,18 @@
             {
               "Ref": "ApiGatewayRestApi"
             },
-            ".execute-api.us-east-1.amazonaws.com/dev"
+            ".execute-api.us-east-1.amazonaws.com/prod"
           ]
         ]
       }
+    }
+  },
+  "Conditions": {
+    "ShouldCreateTable": {
+      "Fn::Equals": [
+        "prod",
+        "dev"
+      ]
     }
   }
 }

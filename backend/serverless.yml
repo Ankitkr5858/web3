@@ -23,6 +23,14 @@ provider:
             - logs:CreateLogStream
             - logs:PutLogEvents
           Resource: "arn:aws:logs:${aws:region}:*:log-group:/aws/lambda/*"
+        - Effect: Allow
+          Action:
+            - lambda:CreateFunction
+            - lambda:UpdateFunctionCode
+            - lambda:UpdateFunctionConfiguration
+            - lambda:DeleteFunction
+            - lambda:GetFunction
+          Resource: "arn:aws:lambda:${aws:region}:*:function:${self:service}-${sls:stage}-*"
 
 plugins:
   - serverless-plugin-typescript
@@ -72,6 +80,11 @@ functions:
     timeout: 10
 
 resources:
+  Conditions:
+    ShouldCreateTable:
+      Fn::Equals:
+        - ${sls:stage}
+        - dev
   Resources:
     PageViewsTable:
       Type: 'AWS::DynamoDB::Table'
@@ -93,6 +106,7 @@ resources:
             Value: ${sls:stage}
           - Key: Service
             Value: ${self:service}
+      Condition: ShouldCreateTable
 
     ApiGatewayLogGroup:
       Type: 'AWS::Logs::LogGroup'
