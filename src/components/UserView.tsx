@@ -85,24 +85,37 @@ export default function UserView() {
 
   useEffect(() => {
     let mounted = true;
+    let retryCount = 0;
+    const maxRetries = 3;
 
     const initMetaMask = async () => {
       try {
+        if (!mounted) return;
         setStatus('loading');
         setError('');
         console.log('Starting MetaKeep initialization...');
         const metakeepProvider = new MetaKeepSDKProvider(import.meta.env.VITE_METAKEEP_APP_ID || '');
+        console.log('Created MetaKeep provider with App ID:', import.meta.env.VITE_METAKEEP_APP_ID);
+        await metakeepProvider.initialize();
         
+        if (!metakeepProvider.sdk) {
+          throw new Error('MetaKeep SDK initialization failed');
+        }
+
         if (!mounted) return;
 
         try {
           console.log('Attempting to connect wallet...');
           const wallet = await metakeepProvider.connect();
+          if (!wallet) {
+            throw new Error('Wallet connection failed - no wallet data returned');
+          }
           console.log('Wallet connected successfully:', wallet.address);
           setWalletAddress(wallet.address);
           setCurrentChainId(wallet.chainId);
           setProvider(metakeepProvider);
           setStatus('idle');
+          retryCount = 0; // Reset retry count on success
         } catch (error: any) {
           console.error('Wallet connection error:', error);
           throw error;
@@ -111,7 +124,16 @@ export default function UserView() {
       } catch (err: any) {
         if (!mounted) return;
         console.error('Failed to initialize Web3:', err);
-        setError(err.message || 'Failed to connect to wallet');
+        
+        if (retryCount < maxRetries) {
+          retryCount++;
+          console.log(`Retrying initialization (${retryCount}/${maxRetries})...`);
+          setTimeout(initMetaMask, 2000); // Wait 2 seconds before retrying
+          return;
+        }
+
+        const errorMessage = err.message || 'Failed to connect to wallet';
+        setError(`Failed to load MetaKeep SDK: ${errorMessage}. Please refresh the page and try again.`);
         setStatus('error');
         setProvider(null);
       }

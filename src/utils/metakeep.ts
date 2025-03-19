@@ -8,14 +8,28 @@ export class MetaKeepSDKProvider implements MetaKeepProvider {
     this.appId = appId || '3122c75e-8650-4a47-8376-d1dda7ef8c58';
   }
 
+  private static sdkPromise: Promise<void> | null = null;
+
   async initialize(retryCount = 0) {
-    const maxRetries = 5;
+    const maxRetries = 3;
+    const retryDelay = 2000; // 2 seconds
     console.log(`Initializing MetaKeep SDK (attempt ${retryCount + 1}/${maxRetries})`);
     
     // Define MetaKeep on window object
     declare global {
       interface Window {
         MetaKeep: any;
+      }
+    }
+
+    // Check if SDK is already being loaded
+    if (MetaKeepSDKProvider.sdkPromise) {
+      try {
+        await MetaKeepSDKProvider.sdkPromise;
+        if (this.sdk) return;
+      } catch (error) {
+        console.error('Previous SDK initialization failed:', error);
+        MetaKeepSDKProvider.sdkPromise = null;
       }
     }
 
@@ -27,11 +41,14 @@ export class MetaKeepSDKProvider implements MetaKeepProvider {
 
     try {
       console.log('Loading MetaKeep SDK script...');
-      await new Promise<void>((resolve, reject) => {
+      MetaKeepSDKProvider.sdkPromise = new Promise<void>((resolve, reject) => {
         const script = document.createElement('script');
-        script.src = 'https://sdk.metakeep.xyz/v2/sdk.js';
+        script.src = 'https://sdk.metakeep.xyz/v2.0/sdk.js';
         script.async = true;
+        script.defer = true;
         script.crossOrigin = 'anonymous';
+        script.type = 'text/javascript';
+        script.referrerPolicy = 'strict-origin';
 
         const timeout = setTimeout(() => {
           cleanup();
@@ -47,7 +64,7 @@ export class MetaKeepSDKProvider implements MetaKeepProvider {
           try {
             // Wait for SDK to be properly initialized
             let attempts = 0;
-            const maxAttempts = 20;
+            const maxAttempts = 10;
             console.log('Waiting for MetaKeep SDK to initialize...');
             
             while (!window.MetaKeep && attempts < maxAttempts) {
@@ -65,10 +82,21 @@ export class MetaKeepSDKProvider implements MetaKeepProvider {
             if (typeof window.MetaKeep !== 'function') {
               throw new Error('MetaKeep SDK not properly loaded - window.MetaKeep is not a constructor');
             }
-            this.sdk = new window.MetaKeep(this.appId);
-            console.log('MetaKeep SDK initialized successfully');
-            cleanup();
-            resolve();
+            try {
+              if (!this.appId) {
+                throw new Error('MetaKeep App ID is required');
+              }
+              this.sdk = new window.MetaKeep(this.appId);
+              if (!this.sdk) {
+                throw new Error('Failed to create MetaKeep SDK instance');
+              }
+              console.log('MetaKeep SDK initialized successfully');
+              cleanup();
+              resolve();
+            } catch (initError) {
+              cleanup();
+              reject(new Error(`Failed to initialize MetaKeep SDK: ${initError.message}`));
+            }
           } catch (error) {
             cleanup();
             reject(error);
@@ -85,8 +113,8 @@ export class MetaKeepSDKProvider implements MetaKeepProvider {
     } catch (error) {
       console.error('MetaKeep SDK initialization error:', error);
       if (retryCount < maxRetries) {
-        console.warn(`MetaKeep SDK initialization failed, retrying (${retryCount + 1}/${maxRetries})...`);
-        await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
+        console.warn(`MetaKeep SDK initialization failed, retrying in ${retryDelay/1000} seconds...`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
         return this.initialize(retryCount + 1);
       }
       const errorMessage = `Failed to load MetaKeep SDK after ${maxRetries} attempts: ${error.message}`;
@@ -101,7 +129,7 @@ export class MetaKeepSDKProvider implements MetaKeepProvider {
         await this.initialize();
       }
 
-      const connectPromise = this.sdk.connect({
+      const connectPromise = await this.sdk.connect({
         timeout: 30000,
         chainId: 11155111,
         chainConfig: {
