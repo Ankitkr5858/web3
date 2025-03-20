@@ -11,6 +11,8 @@ node_modules
 dist
 dist-ssr
 *.local
+*.pem
+.ssh
 .env
 .aws/credentials
 # Editor directories and files
