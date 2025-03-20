@@ -21,15 +21,17 @@ const logger = winston.createLogger({
 });
 
 const app = express();
-const port = process.env.PORT || 3000;
+const port: number = parseInt(process.env.PORT as string, 10) || 3000;
 
 // DynamoDB client configuration
 const dynamoDb = new DynamoDB.DocumentClient({
   region: process.env.AWS_REGION || 'us-east-1',
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || ''
-  }
+  credentials: process.env.AWS_ACCESS_KEY_ID
+    ? {
+        accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+        secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
+      }
+    : undefined,
 });
 
 // Middleware
@@ -41,7 +43,7 @@ app.post('/telemetry/pageview', async (_req: express.Request, res: express.Respo
   const timestamp = Math.floor(Date.now() / 60000) * 60000; // Round to nearest minute
 
   const params = {
-    TableName: process.env.DYNAMODB_TABLE!,
+    TableName: process.env.DYNAMODB_TABLE || 'default-table',
     Key: { timestamp },
     UpdateExpression: 'SET #count = if_not_exists(#count, :zero) + :inc',
     ExpressionAttributeNames: {
@@ -69,7 +71,7 @@ app.get('/telemetry/pageviews', async (_req: express.Request, res: express.Respo
   const oneHourAgo = now - 3600000;
 
   const params = {
-    TableName: process.env.DYNAMODB_TABLE!,
+    TableName: process.env.DYNAMODB_TABLE || 'default-table',
     ScanIndexForward: false,
     Limit: 60
   };
@@ -77,7 +79,7 @@ app.get('/telemetry/pageviews', async (_req: express.Request, res: express.Respo
   try {
     const result = await dynamoDb.scan(params).promise();
     const filteredItems = result.Items?.filter(item => item.timestamp >= oneHourAgo) || [];
-    console.log(filteredItems, 'hello', result);
+    console.log(filteredItems, 'Page Views Fetched:', result);
     res.status(200).json(filteredItems);
   } catch (error) {
     logger.error('Error fetching page views:', error);
@@ -90,6 +92,8 @@ app.get('/health', (_req: express.Request, res: express.Response) => {
   res.status(200).json({ status: 'healthy' });
 });
 
-app.listen(port, () => {
-  logger.info(`Server running on port ${port}`);
+// Start server
+app.listen(port, '0.0.0.0', () => {
+  logger.info(`🚀 Server running on port ${port}`);
+  console.log(`🚀 Server running on port ${port}`);
 });
