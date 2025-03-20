@@ -1,3 +1,10 @@
+/**
+ * @file TelemetryDashboard.tsx
+ * @description A React component that displays real-time page view analytics using
+ * a line chart. The component fetches telemetry data from an API endpoint and
+ * updates the visualization every minute.
+ */
+
 import React, { useEffect, useState } from 'react';
 import {
   LineChart,
@@ -10,18 +17,41 @@ import {
 } from 'recharts';
 import { Loader2 } from 'lucide-react';
 
+/** API endpoint for telemetry data, configurable via environment variables */
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
+/** 
+ * Interface representing a single page view data point
+ * @interface
+ * @property {number} timestamp - Unix timestamp of the page view
+ * @property {number} count - Number of page views at this timestamp
+ */
 interface PageView {
   timestamp: number;
   count: number;
 }
 
+/**
+ * TelemetryDashboard Component
+ * @component
+ * @description Displays a real-time line chart of page views over time.
+ * Features include:
+ * - Automatic data refresh every minute
+ * - Loading and error states
+ * - Responsive chart layout
+ * - Time-formatted axis labels
+ * @returns {JSX.Element} The rendered dashboard component
+ */
 export default function TelemetryDashboard() {
+  // State management for page view data, loading state, and error handling
   const [pageViews, setPageViews] = useState<PageView[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  /**
+   * Effect hook to fetch and update page view data
+   * Sets up an interval to refresh data every minute
+   */
   useEffect(() => {
     const fetchPageViews = async () => {
       try {
@@ -57,6 +87,11 @@ export default function TelemetryDashboard() {
     );
   }
 
+  /**
+   * Formats a Unix timestamp into a localized time string
+   * @param {number} timestamp - Unix timestamp to format
+   * @returns {string} Formatted time string
+   */
   const formatTime = (timestamp: number) => {
     return new Date(timestamp).toLocaleTimeString();
   };

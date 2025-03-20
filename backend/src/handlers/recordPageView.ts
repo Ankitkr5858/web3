@@ -1,9 +1,26 @@
 import { DynamoDB } from 'aws-sdk';
 import type { APIGatewayProxyHandler } from 'aws-lambda';
 
+/**
+ * DynamoDB client instance for database operations.
+ * Uses mock client for testing environment and real client for production.
+ */
 const dynamoDb = process.env.NODE_ENV === 'test' ? require('../test/setup').mockDynamoDb : new DynamoDB.DocumentClient({
   region: process.env.AWS_REGION
 });
+
+/**
+ * Lambda handler to record a page view in DynamoDB.
+ * 
+ * @description This handler increments a counter in DynamoDB for the current minute.
+ * It uses atomic updates to ensure accurate counting even with concurrent requests.
+ * The timestamp is rounded to the nearest minute to aggregate views.
+ * 
+ * @returns {Promise<APIGatewayProxyResult>} Returns a promise that resolves to an API Gateway response
+ * containing either:
+ * - 200: Success message indicating the view was recorded
+ * - 500: Error message if the database update fails
+ */
 
 export const handler: APIGatewayProxyHandler = async () => {
   const timestamp = Math.floor(Date.now() / 60000) * 60000; // Round to nearest minute

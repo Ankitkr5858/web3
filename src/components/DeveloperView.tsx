@@ -1,3 +1,10 @@
+/**
+ * @file DeveloperView.tsx
+ * @description A React component that provides a developer interface for interacting with
+ * smart contracts. It allows developers to input contract ABIs, interact with contract
+ * functions, and manage saved contracts.
+ */
+
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -9,7 +16,13 @@ import { parseABI, generateTransactionLink } from '../utils/contract';
 import type { ContractFunction, TransactionDetails } from '../types';
 import Web3 from 'web3';
 
-// Test addresses for demonstration
+/**
+ * Test addresses for demonstration purposes
+ * @constant
+ * @type {Object}
+ * @property {string} contract - LINK token contract address on Sepolia testnet
+ * @property {string[]} recipients - List of test recipient addresses
+ */
 const TEST_ADDRESSES = {
   contract: '0x779877A7B0D9E8603169DdbD7836e478b4624789', // LINK token on Sepolia
   recipients: [
@@ -20,7 +33,13 @@ const TEST_ADDRESSES = {
   ]
 };
 
-// Test ERC20 Contract on Sepolia
+/**
+ * Sample ERC20 contract configuration for testing
+ * @constant
+ * @type {Object}
+ * @property {string} address - Contract address from TEST_ADDRESSES
+ * @property {Array} abi - Minimal ABI for ERC20 token interactions
+ */
 const TEST_CONTRACT = {
   address: TEST_ADDRESSES.contract,
   abi: [
@@ -69,6 +88,15 @@ const TEST_CONTRACT = {
   ]
 };
 
+/**
+ * Zod schema for form validation
+ * @constant
+ * Validates:
+ * - contractAddress: Must be exactly 42 characters (Ethereum address length)
+ * - chainId: Must be a positive number
+ * - rpcUrl: Must be a valid URL
+ * - abi: Must not be empty
+ */
 const schema = z.object({
   contractAddress: z.string().min(42).max(42),
   chainId: z.number().min(1),
@@ -76,6 +104,15 @@ const schema = z.object({
   abi: z.string().min(1),
 });
 
+/**
+ * List of supported blockchain networks
+ * @constant
+ * @type {Array<{id: number, name: string, rpcUrl: string}>}
+ * Each network object contains:
+ * - id: Chain ID
+ * - name: Network name
+ * - rpcUrl: RPC endpoint for the network
+ */
 const NETWORKS = [
   { id: 11155111, name: 'Sepolia', rpcUrl: 'https://rpc.sepolia.org' },
   { id: 1, name: 'Ethereum Mainnet', rpcUrl: 'https://eth.llamarpc.com' },
@@ -87,16 +124,32 @@ const NETWORKS = [
 // Local storage key for saved contracts
 const SAVED_CONTRACTS_KEY = 'savedContracts';
 
+/**
+ * DeveloperView Component
+ * @component
+ * @description Main interface for developers to interact with smart contracts.
+ * Provides functionality for:
+ * - Parsing and interacting with contract ABIs
+ * - Managing saved contracts
+ * - Checking token balances
+ * - Generating transaction links
+ * @returns {JSX.Element} The rendered component
+ */
 export default function DeveloperView() {
+  // State for contract functions and interaction
   const [functions, setFunctions] = useState<ContractFunction[]>([]);
   const [selectedFunction, setSelectedFunction] = useState<string>('');
   const [params, setParams] = useState<Record<string, string>>({});
   const [transactionLink, setTransactionLink] = useState<string>('');
+  
+  // State for contract management
   const [savedContracts, setSavedContracts] = useState<Array<{
     name: string;
     address: string;
     abi: string;
   }>>([]);
+  
+  // UI state management
   const [showSavedContracts, setShowSavedContracts] = useState(false);
   const [showAddressHelp, setShowAddressHelp] = useState(false);
   const [balance, setBalance] = useState<string | null>(null);

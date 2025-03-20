@@ -1,3 +1,10 @@
+/**
+ * @file UserView.tsx
+ * @description A React component that handles MetaKeep wallet integration and transaction execution.
+ * This component parses transaction details from URL parameters and facilitates
+ * interaction with smart contracts through MetaKeep's SDK.
+ */
+
 import React, { useEffect, useState, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
@@ -5,7 +12,9 @@ import { CheckCircle, XCircle, Loader2, AlertCircle } from 'lucide-react';
 import type { TransactionDetails } from '../types';
 import { MetaKeepSDKProvider } from '../utils/metakeep';
 
+/** API endpoint for telemetry data, configurable via environment variables */
 const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
+/** Sepolia testnet chain ID for network validation */
 const SEPOLIA_CHAIN_ID = 11155111;
 
 export default function UserView() {
