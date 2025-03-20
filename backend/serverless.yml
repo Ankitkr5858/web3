@@ -2,6 +2,7 @@ service: metakeep-transaction-telemetry
 
 provider:
   name: aws
+  profile: serverless-admin
   runtime: nodejs18.x
   region: us-east-1
   stage: ${opt:stage, 'dev'}
@@ -10,19 +11,20 @@ provider:
     NODE_ENV: ${sls:stage}
   iam:
     role:
+      name: ${self:service}-${sls:stage}-lambda-role
       statements:
         - Effect: Allow
           Action:
             - dynamodb:PutItem
             - dynamodb:Query
             - dynamodb:UpdateItem
-          Resource: "arn:aws:dynamodb:${aws:region}:*:table/${self:provider.environment.DYNAMODB_TABLE}"
+          Resource: "arn:aws:dynamodb:${aws:region}:503711231251:table/${self:provider.environment.DYNAMODB_TABLE}"
         - Effect: Allow
           Action:
             - logs:CreateLogGroup
             - logs:CreateLogStream
             - logs:PutLogEvents
-          Resource: "arn:aws:logs:${aws:region}:*:log-group:/aws/lambda/*"
+          Resource: "arn:aws:logs:${aws:region}:503711231251:log-group:/aws/lambda/*"
         - Effect: Allow
           Action:
             - lambda:CreateFunction
@@ -30,7 +32,46 @@ provider:
             - lambda:UpdateFunctionConfiguration
             - lambda:DeleteFunction
             - lambda:GetFunction
-          Resource: "arn:aws:lambda:${aws:region}:*:function:${self:service}-${sls:stage}-*"
+            - lambda:InvokeFunction
+            - lambda:AddPermission
+            - lambda:RemovePermission
+            - lambda:ListFunctions
+          Resource: "*"
+        - Effect: Allow
+          Action:
+            - cloudformation:CreateStack
+            - cloudformation:UpdateStack
+            - cloudformation:DeleteStack
+            - cloudformation:DescribeStacks
+            - cloudformation:DescribeStackEvents
+            - cloudformation:ValidateTemplate
+            - cloudformation:List*
+          Resource: "*"
+        - Effect: Allow
+          Action:
+            - s3:CreateBucket
+            - s3:DeleteBucket
+            - s3:ListBucket
+            - s3:PutObject
+            - s3:GetObject
+            - s3:DeleteObject
+          Resource:
+            - "arn:aws:s3:::${self:service}-*"
+            - "arn:aws:s3:::${self:service}-*/*"
+        - Effect: Allow
+          Action:
+            - iam:GetRole
+            - iam:CreateRole
+            - iam:PutRolePolicy
+            - iam:DeleteRolePolicy
+            - iam:DeleteRole
+            - iam:PassRole
+            - iam:AttachRolePolicy
+          Resource: "*"
+        - Effect: Allow
+          Action:
+            - apigateway:*
+          Resource: "*"
 
 plugins:
   - serverless-plugin-typescript

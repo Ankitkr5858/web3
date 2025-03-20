@@ -3,18 +3,25 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "deploy": "serverless deploy",
-    "dev": "serverless offline",
+    "start": "node dist/server.js",
+    "dev": "ts-node-dev src/server.ts",
     "test": "jest --verbose",
     "lint": "eslint . --ext .ts",
     "build": "tsc"
   },
   "dependencies": {
-    "@types/aws-lambda": "^8.10.134",
-    "aws-sdk": "^2.1574.0"
+    "@types/winston": "^2.4.4",
+    "aws-sdk": "^2.1692.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "winston": "^3.17.0"
   },
   "devDependencies": {
+    "@types/cors": "^2.8.17",
+    "@types/express": "^4.17.21",
     "@types/jest": "^29.5.12",
+    "@types/node": "^22.13.10",
     "@typescript-eslint/eslint-plugin": "^7.0.1",
     "@typescript-eslint/parser": "^7.0.1",
     "eslint": "^8.56.0",
@@ -23,6 +30,7 @@
     "serverless-offline": "^13.3.3",
     "serverless-plugin-typescript": "^2.1.5",
     "ts-jest": "^29.1.2",
-    "typescript": "^5.5.3"
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.2"
   }
 }

@@ -74,13 +74,13 @@
     "RecordPageViewLogGroup": {
       "Type": "AWS::Logs::LogGroup",
       "Properties": {
-        "LogGroupName": "/aws/lambda/metakeep-transaction-telemetry-prod-recordPageView"
+        "LogGroupName": "/aws/lambda/metakeep-transaction-telemetry-dev-recordPageView"
       }
     },
     "GetPageViewsLogGroup": {
       "Type": "AWS::Logs::LogGroup",
       "Properties": {
-        "LogGroupName": "/aws/lambda/metakeep-transaction-telemetry-prod-getPageViews"
+        "LogGroupName": "/aws/lambda/metakeep-transaction-telemetry-dev-getPageViews"
       }
     },
     "IamRoleLambdaExecution": {
@@ -109,7 +109,7 @@
                 "-",
                 [
                   "metakeep-transaction-telemetry",
-                  "prod",
+                  "dev",
                   "lambda"
                 ]
               ]
@@ -126,7 +126,7 @@
                   ],
                   "Resource": [
                     {
-                      "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/metakeep-transaction-telemetry-prod*:*"
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/metakeep-transaction-telemetry-dev*:*"
                     }
                   ]
                 },
@@ -137,7 +137,7 @@
                   ],
                   "Resource": [
                     {
-                      "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/metakeep-transaction-telemetry-prod*:*:*"
+                      "Fn::Sub": "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/metakeep-transaction-telemetry-dev*:*:*"
                     }
                   ]
                 },
@@ -148,7 +148,7 @@
                     "dynamodb:Query",
                     "dynamodb:UpdateItem"
                   ],
-                  "Resource": "arn:aws:dynamodb:us-east-1:*:table/metakeep-transaction-telemetry-prod"
+                  "Resource": "arn:aws:dynamodb:us-east-1:503711231251:table/metakeep-transaction-telemetry-dev"
                 },
                 {
                   "Effect": "Allow",
@@ -157,7 +157,7 @@
                     "logs:CreateLogStream",
                     "logs:PutLogEvents"
                   ],
-                  "Resource": "arn:aws:logs:us-east-1:*:log-group:/aws/lambda/*"
+                  "Resource": "arn:aws:logs:us-east-1:503711231251:log-group:/aws/lambda/*"
                 },
                 {
                   "Effect": "Allow",
@@ -166,28 +166,68 @@
                     "lambda:UpdateFunctionCode",
                     "lambda:UpdateFunctionConfiguration",
                     "lambda:DeleteFunction",
-                    "lambda:GetFunction"
+                    "lambda:GetFunction",
+                    "lambda:InvokeFunction",
+                    "lambda:AddPermission",
+                    "lambda:RemovePermission",
+                    "lambda:ListFunctions"
                   ],
-                  "Resource": "arn:aws:lambda:us-east-1:*:function:metakeep-transaction-telemetry-prod-*"
+                  "Resource": "*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "cloudformation:CreateStack",
+                    "cloudformation:UpdateStack",
+                    "cloudformation:DeleteStack",
+                    "cloudformation:DescribeStacks",
+                    "cloudformation:DescribeStackEvents",
+                    "cloudformation:ValidateTemplate",
+                    "cloudformation:List*"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "s3:CreateBucket",
+                    "s3:DeleteBucket",
+                    "s3:ListBucket",
+                    "s3:PutObject",
+                    "s3:GetObject",
+                    "s3:DeleteObject"
+                  ],
+                  "Resource": [
+                    "arn:aws:s3:::metakeep-transaction-telemetry-*",
+                    "arn:aws:s3:::metakeep-transaction-telemetry-*/*"
+                  ]
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "iam:GetRole",
+                    "iam:CreateRole",
+                    "iam:PutRolePolicy",
+                    "iam:DeleteRolePolicy",
+                    "iam:DeleteRole",
+                    "iam:PassRole",
+                    "iam:AttachRolePolicy"
+                  ],
+                  "Resource": "*"
+                },
+                {
+                  "Effect": "Allow",
+                  "Action": [
+                    "apigateway:*"
+                  ],
+                  "Resource": "*"
                 }
               ]
             }
           }
         ],
         "Path": "/",
-        "RoleName": {
-          "Fn::Join": [
-            "-",
-            [
-              "metakeep-transaction-telemetry",
-              "prod",
-              {
-                "Ref": "AWS::Region"
-              },
-              "lambdaRole"
-            ]
-          ]
-        }
+        "RoleName": "metakeep-transaction-telemetry-dev-lambda-role"
       }
     },
     "RecordPageViewLambdaFunction": {
@@ -197,17 +237,17 @@
           "S3Bucket": {
             "Ref": "ServerlessDeploymentBucket"
           },
-          "S3Key": "serverless/metakeep-transaction-telemetry/prod/1742334640910-2025-03-18T21:50:40.910Z/recordPageView.zip"
+          "S3Key": "serverless/metakeep-transaction-telemetry/dev/1742482763426-2025-03-20T14:59:23.426Z/recordPageView.zip"
         },
         "Handler": "src/handlers/recordPageView.handler",
         "Runtime": "nodejs18.x",
-        "FunctionName": "metakeep-transaction-telemetry-prod-recordPageView",
+        "FunctionName": "metakeep-transaction-telemetry-dev-recordPageView",
         "MemorySize": 256,
         "Timeout": 10,
         "Environment": {
           "Variables": {
-            "DYNAMODB_TABLE": "metakeep-transaction-telemetry-prod",
-            "NODE_ENV": "prod",
+            "DYNAMODB_TABLE": "metakeep-transaction-telemetry-dev",
+            "NODE_ENV": "dev",
             "CORS_ORIGIN": "*"
           }
         },
@@ -229,17 +269,17 @@
           "S3Bucket": {
             "Ref": "ServerlessDeploymentBucket"
           },
-          "S3Key": "serverless/metakeep-transaction-telemetry/prod/1742334640910-2025-03-18T21:50:40.910Z/getPageViews.zip"
+          "S3Key": "serverless/metakeep-transaction-telemetry/dev/1742482763426-2025-03-20T14:59:23.426Z/getPageViews.zip"
         },
         "Handler": "src/handlers/getPageViews.handler",
         "Runtime": "nodejs18.x",
-        "FunctionName": "metakeep-transaction-telemetry-prod-getPageViews",
+        "FunctionName": "metakeep-transaction-telemetry-dev-getPageViews",
         "MemorySize": 256,
         "Timeout": 10,
         "Environment": {
           "Variables": {
-            "DYNAMODB_TABLE": "metakeep-transaction-telemetry-prod",
-            "NODE_ENV": "prod",
+            "DYNAMODB_TABLE": "metakeep-transaction-telemetry-dev",
+            "NODE_ENV": "dev",
             "CORS_ORIGIN": "*"
           }
         },
@@ -254,30 +294,30 @@
         "GetPageViewsLogGroup"
       ]
     },
-    "GetPageViewsLambdaVersion64q7JI6miAZS3vsG4v26OJNaohBn57GZNFd6KeENFI": {
-      "Type": "AWS::Lambda::Version",
-      "DeletionPolicy": "Retain",
-      "Properties": {
-        "FunctionName": {
-          "Ref": "GetPageViewsLambdaFunction"
-        },
-        "CodeSha256": "If9P0acIN5teT17Y4eM4ltAIBoRjYSIzEKDDr2cgQ1k="
-      }
-    },
-    "RecordPageViewLambdaVersionIjYgbb1fLJywTKWQSn2fc7Cuf97Ot98vM8vFHQvSRnc": {
+    "RecordPageViewLambdaVersionhbpYJOz7okPfID6QKWrhmDlINxkblAvpVAhrjtsbLw": {
       "Type": "AWS::Lambda::Version",
       "DeletionPolicy": "Retain",
       "Properties": {
         "FunctionName": {
           "Ref": "RecordPageViewLambdaFunction"
         },
-        "CodeSha256": "If9P0acIN5teT17Y4eM4ltAIBoRjYSIzEKDDr2cgQ1k="
+        "CodeSha256": "x1OjyGJPZ4yLpgYseRSi0ksMwgV2I2baZX2drAi2Zrw="
+      }
+    },
+    "GetPageViewsLambdaVersionQsErPqvJ3OqOzHhjHOcCoEPl3gswBYADjw7qOlXD8": {
+      "Type": "AWS::Lambda::Version",
+      "DeletionPolicy": "Retain",
+      "Properties": {
+        "FunctionName": {
+          "Ref": "GetPageViewsLambdaFunction"
+        },
+        "CodeSha256": "x1OjyGJPZ4yLpgYseRSi0ksMwgV2I2baZX2drAi2Zrw="
       }
     },
     "ApiGatewayRestApi": {
       "Type": "AWS::ApiGateway::RestApi",
       "Properties": {
-        "Name": "prod-metakeep-transaction-telemetry",
+        "Name": "dev-metakeep-transaction-telemetry",
         "EndpointConfiguration": {
           "Types": [
             "EDGE"
@@ -511,13 +551,13 @@
         "GetPageViewsLambdaPermissionApiGateway"
       ]
     },
-    "ApiGatewayDeployment1742334625992": {
+    "ApiGatewayDeployment1742482748969": {
       "Type": "AWS::ApiGateway::Deployment",
       "Properties": {
         "RestApiId": {
           "Ref": "ApiGatewayRestApi"
         },
-        "StageName": "prod"
+        "StageName": "dev"
       },
       "DependsOn": [
         "ApiGatewayMethodTelemetryPageviewOptions",
@@ -604,7 +644,7 @@
       "Type": "AWS::DynamoDB::Table",
       "DeletionPolicy": "Retain",
       "Properties": {
-        "TableName": "metakeep-transaction-telemetry-prod",
+        "TableName": "metakeep-transaction-telemetry-dev",
         "AttributeDefinitions": [
           {
             "AttributeName": "timestamp",
@@ -625,7 +665,7 @@
         "Tags": [
           {
             "Key": "Environment",
-            "Value": "prod"
+            "Value": "dev"
           },
           {
             "Key": "Service",
@@ -648,25 +688,25 @@
         "Ref": "ServerlessDeploymentBucket"
       },
       "Export": {
-        "Name": "sls-metakeep-transaction-telemetry-prod-ServerlessDeploymentBucketName"
-      }
-    },
-    "GetPageViewsLambdaFunctionQualifiedArn": {
-      "Description": "Current Lambda function version",
-      "Value": {
-        "Ref": "GetPageViewsLambdaVersion64q7JI6miAZS3vsG4v26OJNaohBn57GZNFd6KeENFI"
-      },
-      "Export": {
-        "Name": "sls-metakeep-transaction-telemetry-prod-GetPageViewsLambdaFunctionQualifiedArn"
+        "Name": "sls-metakeep-transaction-telemetry-dev-ServerlessDeploymentBucketName"
       }
     },
     "RecordPageViewLambdaFunctionQualifiedArn": {
       "Description": "Current Lambda function version",
       "Value": {
-        "Ref": "RecordPageViewLambdaVersionIjYgbb1fLJywTKWQSn2fc7Cuf97Ot98vM8vFHQvSRnc"
+        "Ref": "RecordPageViewLambdaVersionhbpYJOz7okPfID6QKWrhmDlINxkblAvpVAhrjtsbLw"
       },
       "Export": {
-        "Name": "sls-metakeep-transaction-telemetry-prod-RecordPageViewLambdaFunctionQualifiedArn"
+        "Name": "sls-metakeep-transaction-telemetry-dev-RecordPageViewLambdaFunctionQualifiedArn"
+      }
+    },
+    "GetPageViewsLambdaFunctionQualifiedArn": {
+      "Description": "Current Lambda function version",
+      "Value": {
+        "Ref": "GetPageViewsLambdaVersionQsErPqvJ3OqOzHhjHOcCoEPl3gswBYADjw7qOlXD8"
+      },
+      "Export": {
+        "Name": "sls-metakeep-transaction-telemetry-dev-GetPageViewsLambdaFunctionQualifiedArn"
       }
     },
     "ServiceEndpoint": {
@@ -687,12 +727,12 @@
             {
               "Ref": "AWS::URLSuffix"
             },
-            "/prod"
+            "/dev"
           ]
         ]
       },
       "Export": {
-        "Name": "sls-metakeep-transaction-telemetry-prod-ServiceEndpoint"
+        "Name": "sls-metakeep-transaction-telemetry-dev-ServiceEndpoint"
       }
     },
     "ApiEndpoint": {
@@ -705,7 +745,7 @@
             {
               "Ref": "ApiGatewayRestApi"
             },
-            ".execute-api.us-east-1.amazonaws.com/prod"
+            ".execute-api.us-east-1.amazonaws.com/dev"
           ]
         ]
       }
@@ -714,7 +754,7 @@
   "Conditions": {
     "ShouldCreateTable": {
       "Fn::Equals": [
-        "prod",
+        "dev",
         "dev"
       ]
     }
