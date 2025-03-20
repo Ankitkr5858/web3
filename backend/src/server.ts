@@ -68,7 +68,8 @@ app.post('/telemetry/pageview', async (_req: express.Request, res: express.Respo
 // Get page views endpoint
 app.get('/telemetry/pageviews', async (_req: express.Request, res: express.Response) => {
   const now = Date.now();
-  const oneHourAgo = now - 3600000;
+  const oneHourAgo = 0; // Temporarily set to 0 to return all records
+  
 
   const params = {
     TableName: process.env.DYNAMODB_TABLE || 'default-table',

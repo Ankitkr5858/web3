@@ -2,42 +2,55 @@ import { DynamoDB } from 'aws-sdk';
 import type { APIGatewayProxyHandler } from 'aws-lambda';
 
 /**
- * DynamoDB client instance for database operations.
- * Uses mock client for testing environment and real client for production.
+ * Interface for a page view record stored in DynamoDB.
  */
-const dynamoDb = process.env.NODE_ENV === 'test' ? require('../test/setup').mockDynamoDb : new DynamoDB.DocumentClient({
-  region: process.env.AWS_REGION
-});
+interface PageView {
+  count?: { N: string };
+  timestamp?: { N: string };
+}
+
+/**
+ * DynamoDB client instance for database operations.
+ * Uses a mock client for testing and a real client for production.
+ */
+const dynamoDb = process.env.NODE_ENV === 'test' 
+  ? require('../test/setup').mockDynamoDb 
+  : new DynamoDB.DocumentClient({ region: process.env.AWS_REGION });
 
 /**
  * Lambda handler to retrieve page views from the last hour.
  * 
- * @description This handler queries DynamoDB for all page view records from the past hour.
- * It aggregates view counts per minute to provide telemetry data for the dashboard.
- * 
- * @returns {Promise<APIGatewayProxyResult>} Returns a promise that resolves to an API Gateway response
- * containing either:
- * - 200: Array of page view records with timestamps and counts
- * - 500: Error message if the database query fails
+ * @returns {Promise<APIGatewayProxyResult>} API response with page view data.
  */
-
 export const handler: APIGatewayProxyHandler = async () => {
   const now = Date.now();
-  const oneHourAgo = now - 3600000;
+  const oneHourAgo = now - 3600000; // 1 hour ago
+
+  if (!process.env.DYNAMODB_TABLE) {
+    console.error("DYNAMODB_TABLE environment variable is not set");
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: "Server configuration error" }),
+    };
+  }
 
   const params = {
-    TableName: process.env.DYNAMODB_TABLE!,
-    KeyConditionExpression: '#timestamp >= :oneHourAgo',
-    ExpressionAttributeNames: {
-      '#timestamp': 'timestamp'
-    },
-    ExpressionAttributeValues: {
-      ':oneHourAgo': oneHourAgo
-    }
+    TableName: process.env.DYNAMODB_TABLE,
   };
 
   try {
-    const result = await dynamoDb.query(params).promise();
+    const result = await dynamoDb.scan(params).promise();
+    
+    console.log("Raw DynamoDB Response:", JSON.stringify(result, null, 2));
+
+    // Ensure timestamps are numbers and filter out older records
+    const filteredItems = (result.Items as PageView[])?.filter((item) => {
+      if (!item.timestamp?.N) return false; // Ensure timestamp exists
+      const timestamp = Number(item.timestamp.N); // Convert from DynamoDB's format
+      return timestamp >= oneHourAgo;
+    }) || [];
+
+    console.log("Filtered Items:", JSON.stringify(filteredItems, null, 2));
 
     return {
       statusCode: 200,
@@ -45,17 +58,20 @@ export const handler: APIGatewayProxyHandler = async () => {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Credentials': true,
       },
-      body: JSON.stringify(result.Items)
+      body: JSON.stringify(result.Items ?? [])
     };
+    
+
   } catch (error) {
-    console.error('Error fetching page views:', error);
+    console.error("Error fetching page views:", error);
+    
     return {
       statusCode: 500,
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Credentials': true,
       },
-      body: JSON.stringify({ error: 'Could not fetch page views' })
+      body: JSON.stringify({ error: "Could not fetch page views" }),
     };
   }
 };
