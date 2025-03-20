@@ -4,11 +4,12 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "deploy:backend": "cd backend && npm install && serverless deploy",
+    "start": "node dist/server.js",
+    "dev": "ts-node src/server.ts",
+    "deploy": "npm run build && pm2 restart web3",
     "test": "vitest run",
     "test:watch": "vitest"
   },
