@@ -182,11 +182,20 @@ export default function UserView() {
       setIsProcessing(true);
       setStatus('loading');
 
-      if (currentChainId !== SEPOLIA_CHAIN_ID) {
+      // Verify network state before proceeding
+      const chainId = await provider.getChainId();
+      if (chainId !== SEPOLIA_CHAIN_ID) {
+        console.log('Network mismatch detected, attempting to switch...');
         const switched = await switchToSepoliaNetwork();
         if (!switched) {
+          setError('Please switch to Sepolia network to continue');
           setStatus('pending_network');
           return;
+        }
+        // Double-check network after switch
+        const newChainId = await provider.getChainId();
+        if (newChainId !== SEPOLIA_CHAIN_ID) {
+          throw new Error('Network switch verification failed');
         }
       }
 
@@ -198,17 +207,35 @@ export default function UserView() {
         txDetails.params || []
       );
 
-      // Validate Ethereum address format
+      // Enhanced validation checks
       if (!/^0x[a-fA-F0-9]{40}$/.test(txDetails.contractAddress)) {
         throw new Error('Invalid Ethereum address format');
       }
 
-      // Add transaction timeout
+      // Verify contract exists on the correct network
+      const code = await provider.getCode(txDetails.contractAddress);
+      if (code === '0x' || code === '0x0') {
+        throw new Error('Contract does not exist on Sepolia network');
+      }
+
+      // Validate transaction parameters
+      if (!Array.isArray(txDetails.params)) {
+        throw new Error('Invalid transaction parameters format');
+      }
+
+      // Add transaction timeout and additional safety checks
       const txPromise = provider.signTransaction({
         to: txDetails.contractAddress,
         data: data,
-        value: '0x0'
+        value: '0x0',
+        chainId: SEPOLIA_CHAIN_ID // Explicitly set chainId for additional security
       });
+
+      // Verify transaction chainId matches Sepolia
+      const txData = await provider.getTransactionData();
+      if (txData.chainId !== SEPOLIA_CHAIN_ID) {
+        throw new Error('Transaction chain ID mismatch - possible cross-chain transaction attempt');
+      }
 
       const tx = await Promise.race([
         txPromise,
