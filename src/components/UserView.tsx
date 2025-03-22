@@ -1,440 +1,335 @@
-/**
- * @file UserView.tsx
- * @description A React component that handles MetaKeep wallet integration and transaction execution.
- * This component parses transaction details from URL parameters and facilitates
- * interaction with smart contracts through MetaKeep's SDK.
- */
+import React, { useEffect, useState } from 'react';
+import { useParams, Link } from 'react-router-dom';
+import { MetaKeep } from 'metakeep';
+import { Send, Wallet, AlertCircle, Loader2, ArrowLeft } from 'lucide-react';
+import { TransactionLink } from '../types';
+import { ethers } from 'ethers';
 
-import React, { useEffect, useState, useCallback } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
-import toast from 'react-hot-toast';
-import { CheckCircle, XCircle, Loader2, AlertCircle } from 'lucide-react';
-import type { TransactionDetails } from '../types';
-import { MetaKeepSDKProvider } from '../utils/metakeep';
+const TEST_APP_ID = '3122c75e-8650-4a47-8376-d1dda7ef8c58';
 
-/** API endpoint for telemetry data, configurable via environment variables */
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000';
-/** Sepolia testnet chain ID for network validation */
-const SEPOLIA_CHAIN_ID = 11155111;
-
-export default function UserView() {
-  const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
-  const [txDetails, setTxDetails] = useState<TransactionDetails | null>(null);
-  const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error' | 'pending_network'>(
-    'idle'
-  );
-  const [error, setError] = useState<string>('');
-  const [provider, setProvider] = useState<MetaKeepSDKProvider | null>(null);
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [currentChainId, setCurrentChainId] = useState<number | null>(null);
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(true);
+const UserView: React.FC = () => {
+  const { data } = useParams();
+  const [transactionDetails, setTransactionDetails] = useState<TransactionLink | null>(null);
+  const [sdk, setSdk] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [connecting, setConnecting] = useState(true);
+  const [error, setError] = useState('');
+  const [walletAddress, setWalletAddress] = useState('');
+  const [functionAbi, setFunctionAbi] = useState<any>(null);
+  const [transactionHash, setTransactionHash] = useState('');
+  const [functionInputs, setFunctionInputs] = useState<{ [key: string]: string }>({});
 
   useEffect(() => {
-    const parseTxDetails = () => {
+    if (data) {
       try {
-        const txParam = searchParams.get('tx');
-        if (!txParam) {
-          throw new Error('No transaction details provided');
-        }
+        const decoded = JSON.parse(decodeURIComponent(data));
+        setTransactionDetails(decoded);
 
-        const decodedParam = decodeURIComponent(txParam);
-        const details = JSON.parse(decodedParam);
-
-        if (!details.contractAddress) {
-          throw new Error('Contract address is required');
-        }
-        if (!details.functionName) {
-          throw new Error('Function name is required');
-        }
-        if (!details.abi) {
-          throw new Error('Contract ABI is required');
-        }
-
-        const parsedAbi = JSON.parse(details.abi);
-        if (!Array.isArray(parsedAbi)) {
-          throw new Error('Invalid ABI format');
-        }
-
-        details.params = Array.isArray(details.params) ? details.params : [];
-
-        setTxDetails(details);
-        setStatus('idle');
-      } catch (err: any) {
-        console.error('Error parsing transaction details:', err);
-        setError(err.message || 'Invalid transaction details');
-        setStatus('error');
-      } finally {
-        setIsInitializing(false);
-      }
-    };
-
-    parseTxDetails();
-  }, [searchParams]);
-
-  useEffect(() => {
-    const recordPageView = async () => {
-      try {
-        await fetch(`${API_URL}/telemetry/pageview`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-        });
-      } catch (err) {
-        console.error('Failed to record page view:', err);
-      }
-    };
-
-    if (!isInitializing) {
-      recordPageView();
-    }
-  }, [isInitializing]);
-
-  useEffect(() => {
-    let mounted = true;
-    let retryCount = 0;
-    const maxRetries = 3;
-
-    const initMetaMask = async () => {
-      try {
-        if (!mounted) return;
-        setStatus('loading');
-        setError('');
-        console.log('Starting MetaKeep initialization...');
-        const metakeepProvider = new MetaKeepSDKProvider(import.meta.env.VITE_METAKEEP_APP_ID || '');
-        console.log('Created MetaKeep provider with App ID:', import.meta.env.VITE_METAKEEP_APP_ID);
-        await metakeepProvider.initialize();
-        
-        if (!metakeepProvider.sdk) {
-          throw new Error('MetaKeep SDK initialization failed');
-        }
-
-        if (!mounted) return;
-
-        try {
-          console.log('Attempting to connect wallet...');
-          const wallet = await metakeepProvider.connect();
-          if (!wallet) {
-            throw new Error('Wallet connection failed - no wallet data returned');
+        // Initialize function ABI and inputs
+        if (decoded.contractDetails.abi) {
+          const abiData = JSON.parse(decoded.contractDetails.abi);
+          const foundFunction = abiData.find((item: any) =>
+            item.type === 'function' && item.name === decoded.functionName
+          );
+          if (foundFunction) {
+            setFunctionAbi(foundFunction);
+            const initialInputs: { [key: string]: string } = {};
+            foundFunction.inputs.forEach((input: any) => {
+              initialInputs[input.name] = '';
+            });
+            setFunctionInputs(initialInputs);
           }
-          console.log('Wallet connected successfully:', wallet.address);
-          setWalletAddress(wallet.address);
-          setCurrentChainId(wallet.chainId);
-          setProvider(metakeepProvider);
-          setStatus('idle');
-          retryCount = 0; // Reset retry count on success
-        } catch (error: any) {
-          console.error('Wallet connection error:', error);
-          throw error;
+        }
+      } catch (error) {
+        setError('Invalid transaction data');
+      }
+    }
+  }, [data]);
+
+  useEffect(() => {
+    const initializeSDK = async () => {
+      try {
+        setConnecting(true);
+        const metakeepSDK = new MetaKeep({
+          appId: TEST_APP_ID,
+          chainId: 97,  // For Testnet (use 56 for Mainnet)
+          rpcNodeUrls: {
+            97: "https://data-seed-prebsc-1-s1.binance.org:8545/", // BSC Testnet RPC URL
+          }
+        });
+
+        // Set SDK instance
+        setSdk(metakeepSDK);
+
+        // Get user wallet
+        const user = await metakeepSDK.getUser();
+        if (!user) {
+          // If no user, initiate login
+          await metakeepSDK.login();
         }
 
-      } catch (err: any) {
-        if (!mounted) return;
-        console.error('Failed to initialize Web3:', err);
-        
-        if (retryCount < maxRetries) {
-          retryCount++;
-          console.log(`Retrying initialization (${retryCount}/${maxRetries})...`);
-          setTimeout(initMetaMask, 2000); // Wait 2 seconds before retrying
-          return;
+        // Get wallet after login
+        const wallet = await metakeepSDK.getWallet();
+        if (wallet) {
+          setWalletAddress(wallet?.wallet?.ethAddress);
         }
 
-        const errorMessage = err.message || 'Failed to connect to wallet';
-        setError(`Failed to load MetaKeep SDK: ${errorMessage}. Please refresh the page and try again.`);
-        setStatus('error');
-        setProvider(null);
+        setError('');
+      } catch (error: any) {
+        console.error('MetaKeep SDK initialization error:', error);
+        setError('Failed to initialize MetaKeep SDK. Please try again.');
+      } finally {
+        setConnecting(false);
       }
     };
 
-    if (!isInitializing && !provider && status !== 'error') {
-      initMetaMask();
+    if (data) {
+      initializeSDK();
+    } else {
+      setConnecting(false);
     }
-
-    return () => {
-      mounted = false;
-      if (provider) {
-        provider.disconnect().catch(console.error);
-      }
-    };
-  }, [isInitializing, provider, status]);
-
-  const switchToSepoliaNetwork = useCallback(async () => {
-    if (!provider || isProcessing) {
-      throw new Error('No MetaMask provider found or transaction in progress');
-    }
-
-    try {
-      await provider.switchNetwork(SEPOLIA_CHAIN_ID);
-      setCurrentChainId(SEPOLIA_CHAIN_ID);
-      return true;
-    } catch (error) {
-      console.error('Failed to switch network:', error);
-      return false;
-    }
-  }, [provider, isProcessing]);
-
-  const executeTransaction = useCallback(async () => {
-    if (!txDetails || !provider || !walletAddress || isProcessing) return;
-
-    try {
-      setIsProcessing(true);
-      setStatus('loading');
-
-      // Verify network state before proceeding
-      const chainId = await provider.getChainId();
-      if (chainId !== SEPOLIA_CHAIN_ID) {
-        console.log('Network mismatch detected, attempting to switch...');
-        const switched = await switchToSepoliaNetwork();
-        if (!switched) {
-          setError('Please switch to Sepolia network to continue');
-          setStatus('pending_network');
-          return;
-        }
-        // Double-check network after switch
-        const newChainId = await provider.getChainId();
-        if (newChainId !== SEPOLIA_CHAIN_ID) {
-          throw new Error('Network switch verification failed');
-        }
-      }
-
-      // Create contract interface and encode function data
-      const { Interface } = await import('@ethersproject/abi');
-      const contractInterface = new Interface(JSON.parse(txDetails.abi));
-      const data = contractInterface.encodeFunctionData(
-        txDetails.functionName,
-        txDetails.params || []
-      );
-
-      // Enhanced validation checks
-      if (!/^0x[a-fA-F0-9]{40}$/.test(txDetails.contractAddress)) {
-        throw new Error('Invalid Ethereum address format');
-      }
-
-      // Verify contract exists on the correct network
-      const code = await provider.getCode(txDetails.contractAddress);
-      if (code === '0x' || code === '0x0') {
-        throw new Error('Contract does not exist on Sepolia network');
-      }
-
-      // Validate transaction parameters
-      if (!Array.isArray(txDetails.params)) {
-        throw new Error('Invalid transaction parameters format');
-      }
-
-      // Add transaction timeout and additional safety checks
-      const txPromise = provider.signTransaction({
-        to: txDetails.contractAddress,
-        data: data,
-        value: '0x0',
-        chainId: SEPOLIA_CHAIN_ID // Explicitly set chainId for additional security
-      });
-
-      // Verify transaction chainId matches Sepolia
-      const txData = await provider.getTransactionData();
-      if (txData.chainId !== SEPOLIA_CHAIN_ID) {
-        throw new Error('Transaction chain ID mismatch - possible cross-chain transaction attempt');
-      }
-
-      const tx = await Promise.race([
-        txPromise,
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Transaction timeout - please try again')), 60000)
-        )
-      ]);
-
-      console.log('Transaction hash:', tx.hash);
-      setStatus('success');
-      toast.success('Transaction executed successfully!');
-      
-      // Wait a moment before redirecting
-      setTimeout(() => {
-        navigate('/');
-      }, 2000);
-    } catch (err: any) {
-      console.error('Transaction error:', err);
-      if (err.code === 4001) {
-        setError('Transaction was rejected. Please try again.');
-      } else {
-        setError(err.message || 'Failed to execute transaction');
-      }
-      setStatus('error');
-      toast.error(err.message || 'Transaction failed');
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [txDetails, provider, walletAddress, isProcessing, switchToSepoliaNetwork, navigate]);
-
-  const resetState = useCallback(() => {
-    setStatus('idle');
-    setError('');
-    setIsProcessing(false);
   }, []);
 
-  if (isInitializing) {
+  const handleInputChange = (name: string, value: string) => {
+    setFunctionInputs(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const executeTransaction = async () => {
+    if (!transactionDetails || !sdk || !functionAbi) return;
+
+    setLoading(true);
+    setError('');
+
+    try {
+      const iface = new ethers.utils.Interface(transactionDetails.contractDetails.abi);
+
+      // Prepare parameters based on function inputs
+      const params = functionAbi.inputs.map((input: any) => {
+        const value = functionInputs[input.name];
+        if (input.type === 'uint256') {
+          return ethers.utils.parseEther(value);
+        }
+        return value || '';
+      });
+
+      const encodedData = iface.encodeFunctionData(
+        transactionDetails.functionName,
+        params
+      );
+
+      // For payable functions, use the amount as the value
+      const value = functionAbi.stateMutability === 'payable' && params.length > 0
+        ? params[0]
+        : '0x0';
+
+      const web3Provider = await sdk.ethereum;
+      await web3Provider.enable();
+      const ethersProvider = new ethers.providers.Web3Provider(web3Provider);
+      const signer = ethersProvider.getSigner()
+      const signerAddress = await signer.getAddress()
+      console.log(signerAddress)
+
+      const feeData = await ethersProvider.getFeeData();
+      const maxFeePerGas = feeData?.maxFeePerGas?.toString(); // Automatically fetch maxFeePerGas
+      const maxPriorityFeePerGas = feeData?.maxPriorityFeePerGas?.toString(); // Automatically fetch maxPriorityFeePerGas
+
+      // Create transaction object
+      const transaction = {
+        to: transactionDetails.contractDetails.address,
+        data: encodedData,
+        value: value,
+        chainId: parseInt(transactionDetails.contractDetails.chainId),
+        type: 2,
+        maxFeePerGas: maxFeePerGas,
+        maxPriorityFeePerGas: maxPriorityFeePerGas
+      };
+
+      const txResponse = await signer.sendTransaction(transaction)
+      await txResponse.wait()
+      console.log('Transaction sent:', txResponse.hash);
+      setTransactionHash(txResponse.hash)
+    } catch (error: any) {
+      console.error('Transaction error:', error);
+      setError(error.message || 'Transaction failed');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+
+
+
+  if (!data) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <Loader2 className="animate-spin h-8 w-8 text-indigo-600" />
+      <div className="max-w-2xl mx-auto p-6">
+        <div className="bg-white rounded-lg shadow-lg p-8 text-center">
+          <h1 className="text-2xl font-bold mb-4">No Transaction Found</h1>
+          <p className="text-gray-600 mb-6">
+            To execute a transaction, you need to access this page through a transaction link generated in the Developer view.
+          </p>
+          <Link
+            to="/"
+            className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            <ArrowLeft size={20} />
+            Go to Developer View
+          </Link>
+        </div>
       </div>
     );
   }
 
-  if (!txDetails) {
+  if (connecting) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-white shadow rounded-lg p-6 text-center">
-          <XCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Error</h2>
-          <p className="text-gray-600 mb-6">{error || 'No transaction details provided'}</p>
+      <div className="min-h-[60vh] flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <Loader2 size={40} className="animate-spin mx-auto text-blue-600" />
+          <p className="text-lg text-gray-600">Initializing MetaKeep SDK...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="max-w-2xl mx-auto p-6">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+          <div className="flex items-center gap-3 text-red-700 mb-2">
+            <AlertCircle size={24} />
+            <h2 className="text-lg font-semibold">Error</h2>
+          </div>
+          <p className="text-red-600">{error}</p>
           <a
-            href="/"
-            className="inline-block w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+            href="https://docs.metakeep.xyz/reference/sdk-101"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-block mt-4 text-red-700 hover:text-red-800 underline"
           >
-            Go Back
+            Learn more about MetaKeep SDK
           </a>
         </div>
       </div>
     );
   }
 
-  if (status === 'pending_network') {
+  if (!transactionDetails) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-white shadow rounded-lg p-6 text-center">
-          <AlertCircle className="h-12 w-12 text-yellow-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Network Switch Required</h2>
-          <p className="text-gray-600 mb-6">
-            Please switch to the Sepolia network in your wallet to continue.
-            Once switched, click "Try Again" to proceed with the transaction.
-          </p>
-          <div className="space-y-4">
-            <button
-              onClick={executeTransaction}
-              disabled={isProcessing}
-              className="w-full bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2 disabled:opacity-50"
-            >
-              Try Again
-            </button>
-            <button
-              onClick={resetState}
-              className="w-full bg-gray-200 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (status === 'error') {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-white shadow rounded-lg p-6 text-center">
-          <XCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Error</h2>
-          <p className="text-gray-600 mb-6">{error}</p>
-          <button
-            onClick={resetState}
-            className="w-full bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
-          >
-            Try Again
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (status === 'success') {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
-        <div className="max-w-md w-full bg-white shadow rounded-lg p-6 text-center">
-          <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Success!</h2>
-          <p className="text-gray-600 mb-2">
-            Your transaction has been executed successfully.
-          </p>
-          <p className="text-gray-500 text-sm">
-            Redirecting back to home page...
-          </p>
-        </div>
+      <div className="max-w-2xl mx-auto p-6">
+        <div className="text-center text-gray-600">Loading transaction details...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-lg mx-auto">
-        <div className="bg-white shadow rounded-lg p-6">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">
-            Execute Transaction
-          </h2>
+    <div className="max-w-2xl mx-auto p-6">
+      <h1 className="text-3xl font-bold mb-6">Execute Transaction</h1>
 
-          {currentChainId !== SEPOLIA_CHAIN_ID && (
-            <div className="mb-6 p-4 bg-yellow-50 rounded-md">
-              <p className="text-yellow-700">
-                Please switch to the Sepolia network to continue. The network will be switched automatically when you click "Execute Transaction".
-              </p>
-            </div>
-          )}
-
-          <div className="space-y-4 mb-6">
+      <div className="bg-white rounded-lg shadow-lg p-6 space-y-6">
+        {walletAddress && (
+          <div className="bg-blue-50 border border-blue-100 p-4 rounded-lg flex items-center gap-3">
+            <Wallet size={20} className="text-blue-600" />
             <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Contract Address
-              </label>
-              <div className="mt-1 text-sm text-gray-900 break-all">
-                {txDetails.contractAddress}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Function
-              </label>
-              <div className="mt-1 text-sm text-gray-900">
-                {txDetails.functionName}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Parameters
-              </label>
-              <div className="mt-1 text-sm text-gray-900 break-all">
-                {txDetails.params?.join(', ') || 'No parameters'}
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700">
-                Network
-              </label>
-              <div className="mt-1 text-sm text-gray-900">
-                Sepolia Test Network (Chain ID: {SEPOLIA_CHAIN_ID})
-              </div>
+              <div className="font-medium text-blue-900">Connected Wallet</div>
+              <div className="font-mono text-sm text-blue-700">{walletAddress}</div>
             </div>
           </div>
+        )}
 
-          <button
-            onClick={executeTransaction}
-            disabled={status === 'loading' || !provider || isProcessing}
-            className="w-full flex justify-center items-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 disabled:opacity-50"
-          >
-            {status === 'loading' ? (
-              <>
-                <Loader2 className="animate-spin h-5 w-5 mr-2" />
-                Processing...
-              </>
-            ) : !provider ? (
-              'Connecting to Wallet...'
-            ) : (
-              'Execute Transaction'
+        <div className="space-y-4">
+          <h2 className="text-xl font-semibold">Transaction Details</h2>
+          <div className="grid gap-3">
+            <div className="bg-gray-50 p-3 rounded-md">
+              <div className="text-sm text-gray-600">Contract Address</div>
+              <div className="font-mono">{transactionDetails.contractDetails.address}</div>
+            </div>
+
+            <div className="bg-gray-50 p-3 rounded-md">
+              <div className="text-sm text-gray-600">Function</div>
+              <div className="font-medium">
+                {transactionDetails.functionName}
+                {functionAbi?.stateMutability === 'payable' && (
+                  <span className="ml-2 text-sm text-blue-600">(Payable)</span>
+                )}
+              </div>
+            </div>
+
+            <div className="bg-gray-50 p-3 rounded-md">
+              <div className="text-sm text-gray-600">Network</div>
+              <div className="font-medium">
+                {transactionDetails.contractDetails.chainId === '80001' ? 'Mumbai Testnet' :
+                  transactionDetails.contractDetails.chainId === '137' ? 'Polygon Mainnet' :
+                    'Unknown Network'} ({transactionDetails.contractDetails.chainId})
+              </div>
+            </div>
+
+            {functionAbi && functionAbi.inputs.length > 0 && (
+              <div className="bg-gray-50 p-3 rounded-md space-y-3">
+                <div className="text-sm font-medium text-gray-700">Function Parameters</div>
+                {functionAbi.inputs.map((input: any, index: number) => (
+                  <div key={input.name} className="space-y-1">
+                    <label className="block text-sm text-gray-600">
+                      {input.name} ({input.type})
+                      {functionAbi.stateMutability === 'payable' && input.name === 'amount' && (
+                        <span className="ml-2 text-blue-600">(Transaction Value)</span>
+                      )}
+                    </label>
+                    <input
+                      type={input.type === 'uint256' ? 'number' : 'text'}
+                      value={functionInputs[input.name]}
+                      onChange={(e) => handleInputChange(input.name, e.target.value)}
+                      placeholder={`Enter ${input.name}`}
+                      className="w-full p-2 border rounded-md text-sm font-mono bg-white focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    />
+                  </div>
+                ))}
+              </div>
             )}
-          </button>
+          </div>
         </div>
+
+        <button
+          onClick={executeTransaction}
+          disabled={loading || !sdk}
+          className={`w-full py-3 px-4 rounded-lg flex items-center justify-center gap-2 text-white font-medium transition-colors
+            ${loading || !sdk
+              ? 'bg-gray-400 cursor-not-allowed'
+              : 'bg-blue-600 hover:bg-blue-700 active:bg-blue-800'
+            }`}
+        >
+          {loading ? (
+            <>
+              <Loader2 size={20} className="animate-spin" />
+              Processing Transaction...
+            </>
+          ) : (
+            <>
+              <Send size={20} />
+              Sign & Execute Transaction
+            </>
+          )}
+        </button>
+
+        {/* Transaction hash result */}
+        {transactionHash && (
+          <div className="mt-4">
+            <h2>Transaction Hash:</h2>
+            <a
+              href={`https://testnet.bscscan.com/tx/${transactionHash}`} // Change the link to the appropriate network explorer
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-500"
+            >
+              {transactionHash}
+            </a>
+          </div>
+        )}
       </div>
     </div>
   );
-}
+};
+
+export default UserView;
