@@ -43,7 +43,7 @@ function App() {
     return null;
   }
 
-  return (
+  return (;
     <Router>
       <div className="min-h-screen bg-gray-100">
         <nav className="bg-white shadow-md p-4">
@@ -51,8 +51,8 @@ function App() {
             <h1 className="text-xl font-bold">MetaKeep Transaction Manager</h1>
             <div className="space-x-4">
               <Link
-                to="/"
-                className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900"
+                to="/";
+                className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900";
               >
                 <Code2 size={20} />
                 Developer
@@ -60,15 +60,15 @@ function App() {
               {isLoggedIn ? (
                 <button
                   onClick={handleLogout}
-                  className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900"
+                  className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900";
                 >
                   <LogOut size={20} />
                   Logout
                 </button>
               ) : (
                 <Link
-                  to="/login"
-                  className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900"
+                  to="/login";
+                  className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900";
                 >
                   <Users size={20} />
                   Login
